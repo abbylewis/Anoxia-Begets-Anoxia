@@ -1,0 +1,264 @@
+---
+title: "ASL DO Demand calcs"
+author: "Abby Lewis"
+date: "2022-08-29"
+output: html_document
+---
+
+This file calculates volume-weighted hypolimnetic oxygen demand during the stratified period at each lake. 
+
+Step 1: Load data and packages
+Step 2: Calculate the rate of change in volume-weighted oxygen concentrations during the stratified period at each lake (VHOD)
+Step 3: Calculate temperature-corrected oxygen demand values
+Step 4: Calculate trends in oxygen demand over time
+
+Step 1: Load data and packages
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(lubridate)
+library(rLakeAnalyzer)
+library(openair)
+
+#Load data and stratification boundaries. This file is created by "03 - Stratified avgs.Rmd"
+full_with_thermo = read.csv("../Compiled data/Stratified_period_data_with_thermo.csv")%>%
+  mutate(Date=as.Date(Date))
+```
+
+Step 2: Calculate the rate of change in volume-weighted oxygen concentrations during the stratified period at each lake (VHOD)
+```{r}
+#prepare bathymetry
+#lake with only one method (data/model)
+lake_bats <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/4/6af06151bb8785235ec1b55ded19e42c")%>%
+  filter(Area_m2>0)%>%
+  group_by(LakeID)%>%
+  mutate(methods_n = length(unique(Method)))%>%
+  filter(methods_n==1|Method=="model")%>%
+  ungroup()
+
+#Check bathymetric data availability
+unique(lake_bats$LakeID)[!unique(lake_bats$LakeID)%in%unique(lat_long$LakeID)]
+unique(lat_long$LakeID)[!unique(lat_long$LakeID)%in%unique(lake_bats$LakeID)] #missing full bathymetry for 37 lakes
+
+#Total n to start: 609
+length(unique(full_with_thermo$LakeID))
+
+#Calculate volume-weighted oxygen concentrations
+vw_do= full_with_thermo%>%
+  full_join(lake_bats, by = c("LakeID","Depth_m"))%>%
+  filter(!is.na(IntervalVolume_m3))%>%
+  filter(Depth_m>hypo_depth)%>%
+  mutate(DO_mass = DO_mgL*IntervalVolume_m3,
+         Temp_total = Temp_C*IntervalVolume_m3,
+         Year = year(Date))%>%
+  group_by(Date, LakeID)%>%
+  dplyr::summarize(DO_tot = sum(DO_mass),#sum across all hypolimnetic depths
+                   vol_tot = sum(IntervalVolume_m3),
+                   DO_mgL_vol = DO_tot/vol_tot,#Divide by hypolimnetic volume
+                   DO_mgL_area = DO_tot/max(Area_m2),
+                   Temp_C = sum(Temp_total)/vol_tot)%>%
+  mutate(Year= year(Date))%>%
+  group_by(LakeID, Year)%>%
+  filter(!is.na(DO_mgL_vol))%>%
+  arrange(LakeID, Date)%>%
+  mutate(low_point = ifelse(sum(DO_mgL_vol<1)==0,#Identify the lowest DO value for a given year
+                            Date[which.min(DO_mgL_vol)],
+                            first(Date[DO_mgL_vol<1])))%>%
+  filter(is.na(low_point)|Date<=low_point)%>% #Remove days after the lowest DO value
+  ungroup()
+
+length(unique(vw_do$LakeID)) #581 lakes left
+
+#Calculate the rate of change in volume-weighted concentrations using lm
+vw_do_demand = vw_do%>%
+  mutate(Year = year(Date))%>%
+  group_by(Year, LakeID)%>%
+  dplyr::summarize(n = n(),
+            DO_demand_mgLd = -lm(DO_mgL_vol~Date)$coefficients[2],
+            AHOD_mgLd = -lm(DO_mgL_area~Date)$coefficients[2],
+            p_vol = summary(lm(DO_mgL_vol~Date))$coefficients[8],
+            p_area = summary(lm(DO_mgL_area~Date))$coefficients[8],
+            r2_vol = summary(lm(DO_mgL_vol~Date))$r.squared,
+            r2_area = summary(lm(DO_mgL_area~Date))$r.squared,
+            Temp_C = mean(Temp_C, na.rm = T))%>%
+  filter(n>=3)#Need at least 3 points
+length(unique(vw_do_demand$LakeID[!is.na(vw_do_demand$DO_demand_mgLd)]))
+nrow(vw_do_demand[!is.na(vw_do_demand$DO_demand_mgLd),])
+
+#How many rows get removed by filtering so R2>0.5? 246
+removed_by_r2 = vw_do_demand%>%
+  filter(r2_vol>.5)
+nrow(removed_by_r2[!is.na(removed_by_r2$DO_demand_mgLd),])
+nrow(vw_do_demand[!is.na(vw_do_demand$DO_demand_mgLd),])
+5385-5139
+(5385-5139)/5385
+
+#How many rows get removed by filtering so oxygen demand is positive? 0
+removed_by_pos = removed_by_r2%>%
+  filter(DO_demand_mgLd>0)
+nrow(removed_by_pos[!is.na(removed_by_pos$DO_demand_mgLd),])
+
+#Finish QAQC
+good_hod = vw_do_demand%>%
+  group_by(LakeID)%>%
+  filter(!is.na(DO_demand_mgLd),
+         r2_vol>0.5
+         )%>%
+  dplyr::summarize(n_neg = sum(DO_demand_mgLd<0),
+                   n = n(),
+                   pct = n_neg/n*100)%>%
+  filter(pct<=10)
+length(unique(good_hod$LakeID))
+
+vw_do_demand_qaqc = removed_by_pos%>%
+  filter(LakeID %in% good_hod$LakeID)
+
+nrow(vw_do_demand_qaqc[!is.na(vw_do_demand_qaqc$DO_demand_mgLd),])
+length(unique(vw_do_demand_qaqc$LakeID[!is.na(vw_do_demand_qaqc$DO_demand_mgLd)]))
+
+#Success!
+write.csv(vw_do_demand_qaqc, "../Compiled data/VW oxygen demand points.csv", row.names = F)
+```
+
+
+Step 3: Calculate temperature-corrected oxygen demand values
+```{r}
+vhod5 = vw_do_demand_qaqc%>%
+  mutate(Temp_factor = ((Temp_C)/10)^0.65,
+         VHOD5_mgLd = DO_demand_mgLd/Temp_factor)%>%
+  filter(!is.na(VHOD5_mgLd))%>%
+  dplyr::select(Year,LakeID,Temp_factor,VHOD5_mgLd)
+
+vw_do_demand_qaqc%>%
+  ggplot(aes(x = Year,y=Temp_C))+
+  geom_point()
+
+write.csv(vhod5, "../Compiled data/VHOD5 points.csv", row.names = F)
+```
+
+
+Step 4: Calculate trends in oxygen demand over time
+```{r}
+split_year = 1800
+
+sen_slope_custom <- function(df,var){
+  output = df%>%
+    mutate(era = ifelse(Year<split_year,"before","after"))%>%
+    group_by(LakeID,era)%>%
+    dplyr::summarize(n = n(),
+              trend = NA,
+              sig = NA,
+              min_year = NA,
+              max_year = NA)
+  for(lake in unique(df$LakeID)){
+    for(era in c("before","after")){
+      print(paste(lake,era))
+      filt = df%>%
+        filter(LakeID==lake)%>%
+        mutate(date = as.POSIXct(paste0(Year,"-01-01")))
+      if(era == "before"){
+        filt = filt%>%
+          ungroup()%>%
+          filter(Year<split_year)%>%
+          dplyr::select(-Year)
+      }else{
+        filt = filt%>%
+          ungroup()%>%
+          filter(Year>split_year)%>%
+          dplyr::select(-Year)
+      }
+      if(length(unique(year(filt$date)))>=5){
+        sen = TheilSen(filt, pollutant = var, avg.time = "year", plot = F)$data$res2
+        output$trend[output$LakeID==lake&output$era == era]<-sen$slope[1]
+        output$sig[output$LakeID==lake&output$era == era]<-sen$p[1]
+        output$min_year[output$LakeID==lake&output$era == era]<-min(year(filt$date))
+        output$max_year[output$LakeID==lake&output$era == era]<-max(year(filt$date))
+      }
+    }
+  }
+  return(output)
+}
+
+vw_demand_sen = sen_slope_custom(vw_do_demand_qaqc,"DO_demand_mgLd")
+
+vhod5_sen = sen_slope_custom(vhod5,"VHOD5_mgLd")
+
+vw_demand_sen%>%
+  filter(!is.na(trend),
+         sig<0.05)%>%
+  mutate(type = ifelse(trend<0,"Decreasing","Increasing"))%>%
+  ggplot(aes(x = type))+
+  geom_bar()+
+  xlab("")+
+  ggtitle("Of lakes with significant demand trends:")
+
+vw_demand_sen%>%
+  ungroup()%>%
+  filter(!is.na(trend))%>%
+  mutate(n_tot = n())%>%
+  filter(sig<0.05)%>%
+  mutate(type = ifelse(trend<0,"Decreasing","Increasing"))%>%
+  group_by(type)%>%
+  dplyr::summarize(n = n(),
+                   pct = n/unique(n_tot)*100)
+
+vhod5_sen%>%
+  filter(!is.na(trend),
+         sig<0.05)%>%
+  mutate(type = ifelse(trend<0,"Decreasing","Increasing"))%>%
+  ggplot(aes(x = type))+
+  geom_bar()+
+  xlab("")+
+  ggtitle("Of lakes with significant temp-corrected demand trends:")
+
+vhod5_sen%>%
+  ungroup()%>%
+  filter(!is.na(trend))%>%
+  mutate(n_tot = n())%>%
+  filter(sig<0.05)%>%
+  mutate(type = ifelse(trend<0,"Decreasing","Increasing"))%>%
+  group_by(type)%>%
+  dplyr::summarize(n = n(),
+                   pct = n/unique(n_tot)*100)
+
+vhod5_sen%>%
+  filter(!is.na(trend),
+         sig<0.05)%>%
+  rename(trend_vhod5 = trend)%>%
+  dplyr::select(-sig,-n,-min_year,-max_year)%>%
+  full_join(vw_demand_sen%>%
+              filter(!is.na(trend),
+                     sig<0.05)%>%
+              rename(trend_vhod = trend)%>%
+              dplyr::select(-sig,-n,-min_year,-max_year))
+
+vhod5_sen%>%
+  rename(trend_vhod5 = trend)%>%
+  dplyr::select(-sig,-n,-min_year,-max_year)%>%
+  full_join(vw_demand_sen%>%
+              rename(trend_vhod = trend)%>%
+              dplyr::select(-sig,-n,-min_year,-max_year))%>%
+  ggplot(aes(x = trend_vhod, y = trend_vhod5))+
+  geom_point()+
+  geom_abline(slope=1)
+
+median = median(vhod5_sen$trend, na.rm = T)
+vhod5_sen%>%
+  ggplot(aes(x = trend))+
+  geom_density()+
+  geom_vline(xintercept = median, lty = "dashed")+
+  geom_vline(xintercept = 0)
+
+vhod5_sen_format = vhod5_sen%>%
+  mutate(var = "VHOD5",
+         Layer = "HYPO",
+         season = "Summer")
+
+vw_demand_sen_format = vw_demand_sen%>%
+  mutate(var = "DO_demand",
+         Layer = "HYPO",
+         season = "Summer")
+
+write.csv(vhod5_sen_format, "../Compiled data/VHOD5 trends.csv", row.names = F)
+write.csv(vw_demand_sen_format, "../Compiled data/VW oxygen demand trends.csv", row.names = F)
+```

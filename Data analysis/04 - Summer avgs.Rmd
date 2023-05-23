@@ -1,0 +1,236 @@
+---
+title: "Summer avgs"
+author: "Abby Lewis"
+date: "2022-11-22"
+output: html_document
+---
+
+This file loads temp/DO/productivity data and calculates mean concentrations of each focal variable during the late-summer period (July 15-Aug 31 in the Northern Hemisphere). Functionally, all of the code here will be very similar to "03 - Stratified avgs.Rmd", except that that file is for the whole stratified period and this file is ONLY for the late-summer period. All code chunks must be run in order.
+
+Step 1: Load data and packages
+Step 2: QAQC
+Step 3: Filter to stratified period and calculate thermocline depths
+Step 4: Calculate average values within each layer
+Step 5: Add buoyancy frequency during the late-summer period
+Step 6: Calculate the percentage of the water column that is anoxic each year
+
+
+Step 1: Load data and packages
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(lubridate)
+library(rLakeAnalyzer)
+library(openair)
+source("thermo.depth.density.R")
+
+## Load productivity data and metadata from EDI
+p = read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/4/0ece9d7b67cd49741ed7ee60192832e4")
+lat_long = read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/4/fadd3eaa25b5fdd1fc4efba70e660579")
+#Load interpolated DO data file, created by "02 - Temp and DO interpolation.Rmd"
+do = read.csv("../Compiled data/temp_o2_interpolated.csv")
+```
+
+
+Step 2: QAQC
+```{r}
+#Merge P, DO, and lake info (from lat long file)
+full = p%>%
+  full_join(do, by = c("Date","LakeID","Depth_m"))%>%
+  full_join(lat_long, by = c("LakeID"))%>%
+  mutate(Date = as.Date(Date))%>%
+  filter(is.na(MaximumDepth_m)|!MaximumDepth_m<6.4)
+
+#Create a Date_22 column, so that I can filter to only the end of summer
+full$Date_22 <- full$Date
+year(full$Date_22)<-2022
+
+#There are a few rows with missing dates because these lakes are in the lat long database and not do/p
+full%>%
+  filter(is.na(as.Date(Date)))
+
+#Remove these NAs for now
+full = full%>%
+  filter(!is.na(Date))
+
+#Missing depths
+p = full%>%
+  filter(is.na(Depth_m)) #Fair # of missing depths, mostly from the Jane et al. data publication
+unique(p$LakeID)
+
+q = full%>%
+  filter(is.na(Depth_m)&is.na(Interval)) #Most of the missing depths that are NOT from the Jane et al. data publication have the interval filled in
+unique(q$LakeID)
+```
+
+
+Step 3: Filter to stratified period and calculate thermocline depths
+```{r}
+full_trimmed = full%>%
+  filter(((Latitude_DD>0)&Date_22>=as.Date("2022-07-15")&Date_22<=as.Date("2022-08-31"))|
+           ((Latitude_DD<0)&Date_22>=as.Date("2022-01-15")&Date_22<=as.Date("2022-02-28")))%>%
+  dplyr::select(-Date_22)%>%
+  mutate(start_date = ifelse(Latitude_DD>0,"2022-07-15","2022-01-15"))
+
+#Calculate thermocline depths
+thermo_depths = full_trimmed%>%
+  group_by(Date, LakeID, Depth_m)%>%
+  dplyr::summarize(Temp_C = mean(Temp_C, na.rm = T))%>%
+  filter(!is.na(Temp_C))%>%
+  ungroup()%>%
+  group_by(Date, LakeID)%>%
+  dplyr::summarize(epi_depth = meta.depths(Temp_C,Depth_m,mixed.cutoff = 0)[1],
+            hypo_depth = meta.depths(Temp_C,Depth_m,mixed.cutoff = 0)[2],
+            max_depth = max(Depth_m),
+            thermo = thermo.depth.density(Temp_C,Depth_m, mixed.cutoff = 0.1, seasonal = F))%>% #use custom density threshold function
+  mutate(Year= year(Date),
+         unstrat = as.numeric(is.na(thermo)))%>%
+  group_by(Year,LakeID)%>%
+  dplyr::summarize(epi_depth = mean(epi_depth, na.rm = T),
+            hypo_depth = mean(hypo_depth, na.rm = T),
+            count_unstrat = sum(unstrat),
+            n = n())
+
+#How many are removed by filtering out lakes with 10% of profiles being unstratified?
+thermo_depths%>%
+  group_by(LakeID)%>%
+  dplyr::mutate(count_unstrat_tot = sum(count_unstrat),
+                n = sum(n))%>%
+  filter((count_unstrat_tot/n) >=0.1)%>%
+  ungroup()%>%
+  summarize(lakes = length(unique(LakeID)))
+
+#Remove years with unstratified profiles and lakes where 10% of years have unstratified profiles
+thermo_depths_sum = thermo_depths%>%
+  group_by(LakeID)%>%
+  dplyr::mutate(count_unstrat_tot = sum(count_unstrat),
+                n = sum(n))%>%
+  filter((count_unstrat_tot/n) <0.1,
+         count_unstrat == 0)%>%
+  group_by(LakeID,Year)%>%
+  dplyr::summarize(epi_sd = sd(epi_depth, na.rm = T),
+            epi_depth = mean(epi_depth, na.rm = T),
+            hypo_sd = sd(hypo_depth, na.rm = T),
+            hypo_depth = mean(hypo_depth, na.rm = T))
+```
+
+
+Step 4: Calculate average values within each layer
+```{r}
+#Add thermocline depths
+full_with_thermo = full_trimmed%>%
+  mutate(Year = year(Date))%>%
+  full_join(thermo_depths_sum)%>%
+  filter(!is.na(epi_depth),
+         !is.na(hypo_depth),
+         )
+#Add discrete layer designations from data providers
+summer_layers = full_with_thermo%>%
+  mutate(Layer = ifelse(!is.na(Depth_m)&Depth_m<epi_depth, "EPI", NA),
+         Layer = ifelse(is.na(Depth_m)&!is.na(Interval)&Interval=="EPILIMNION","EPI",Layer),
+         Layer = ifelse(!is.na(Depth_m)&Depth_m>hypo_depth,"HYPO",Layer),
+         Layer = ifelse(is.na(Depth_m)&!is.na(Interval)&Interval=="HYPOLIMNION","HYPO",Layer),
+         Layer = ifelse(!is.na(Depth_m)&Depth_m<hypo_depth&Depth_m>epi_depth, "META",Layer),
+         Layer = ifelse(is.na(Depth_m)&!is.na(Interval)&Interval=="METALIMNION","META",Layer))%>%
+  filter(!is.na(Layer))
+
+#Calculate averages
+summer_avgs = summer_layers%>%
+  mutate(start_date = as.Date(paste0(year(Date),"-",month(start_date),"-",day(start_date))))%>%
+  group_by(LakeID,Year, Layer)%>% #not separating by measurement location. Is this a problem?
+  dplyr::summarize(TP_ugL = mean(TP_ugL, na.rm = T),
+                   TP_date = as.numeric(mean(Date[!is.na(TP_ugL)],na.rm=T)-unique(start_date)),
+                   DOC_mgL = mean(DOC_mgL, na.rm = T),
+                   DOC_date = as.numeric(mean(Date[!is.na(DOC_mgL)],na.rm=T)-unique(start_date)),
+                   DO_mgL = mean(DO_mgL, na.rm = T),
+                   DO_date = as.numeric(mean(Date[!is.na(DO_mgL)],na.rm=T)-unique(start_date)),
+                   Chla_ugL = mean(Chla_ugL, na.rm = T),
+                   Chla_date = as.numeric(mean(Date[!is.na(DO_mgL)],na.rm=T)-unique(start_date)),
+                   Temp_C = mean(Temp_C, na.rm = T),
+                   Temp_date = as.numeric(mean(Date[!is.na(Temp_C)],na.rm=T)-unique(start_date)),
+                   TN_ugL = mean(TN_ugL, na.rm = T),
+                   TN_date = as.numeric(mean(Date[!is.na(TN_ugL)],na.rm=T)-unique(start_date)))
+```
+
+
+Step 5: Add buoyancy frequency during the late-summer period
+```{r}
+buoyancy = full_trimmed%>%
+  group_by(Date, LakeID, Depth_m)%>%
+  dplyr::summarize(Temp_C = mean(Temp_C, na.rm = T))%>%
+  filter(!is.na(Temp_C))%>%
+  ungroup()%>%
+  group_by(Date, LakeID)%>%
+  dplyr::summarize(buoyancy_freq = max(buoyancy.freq(Temp_C,Depth_m),na.rm=T))%>%
+  mutate(Year=year(Date))%>%
+  group_by(Year,LakeID)%>%
+  dplyr::summarize(buoyancy_freq = mean(buoyancy_freq,na.rm=T))
+
+summer_avgs = summer_avgs%>%
+  left_join(buoyancy)
+
+#All done!
+write.csv(summer_avgs, "../Compiled data/summer_averages_wi.csv", row.names = F)
+```
+
+
+Step 6: Calculate the percentage of the water column that is anoxic each year
+```{r}
+## Load bathymetry data
+lake_bats.raw <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/4/6af06151bb8785235ec1b55ded19e42c")%>%
+  filter(Area_m2>0)
+useprofiles <- summer_layers
+
+#Prepare bathymetry data
+#If there is only modeled bathymetry, use that. Otherwise, use contributed data
+hasonlyonemethod <-lake_bats.raw %>% dplyr::select(LakeID,Method) %>% unique() %>% group_by(LakeID) %>% summarize(methods=n()) %>% filter(methods!=2)
+lake_bats <- rbind(
+  lake_bats.raw %>% 
+    filter(Method=="data") ,
+  lake_bats.raw %>% 
+    filter(Method == "model" ) %>%  
+    filter(LakeID %in% hasonlyonemethod$LakeID)
+  )
+
+#Set threshold of anoxia
+o2thresh<-1 #mg/L
+
+#Find the top depth where DO is below the threshold (firstbelowthresh)
+tl_percent_anoxic_and_oxic <- useprofiles[,] %>%  
+  mutate(year=year(Date)) %>% 
+  group_by(LakeID) %>%  
+  mutate(depth_max=max(Depth_m)+1) %>% #find deepest sampling point for each lake, add 1 to get the sediment depth
+  ungroup() %>% 
+  group_by(LakeID,year, Depth_m,depth_max) %>% 
+  dplyr::summarise(DO_mgL = mean(DO_mgL, na.rm = T))%>%
+  group_by(LakeID,year)%>%
+  filter(DO_mgL<o2thresh) %>%
+  dplyr::summarize(firstbelowthresh = min(Depth_m),
+            maxdepths=max(depth_max))
+
+#Calculate affected sediment area
+areal <- tl_percent_anoxic_and_oxic  %>%
+  mutate(Depth_m=ceiling(firstbelowthresh)) %>% #highest anoxic depth (according to the threshold above)
+  dplyr::select(-firstbelowthresh) %>% 
+  left_join(lake_bats %>% 
+              dplyr::select(LakeID,Area_m2,Depth_m),by=c("LakeID","Depth_m")) %>%
+  left_join(lake_bats %>% 
+              filter(Depth_m==0) %>% 
+              rename(area.full=Area_m2) %>% 
+              dplyr::select(LakeID,area.full),by=c("LakeID"))%>%
+  mutate(depth_ratio = (maxdepths-Depth_m)/maxdepths,
+         areal_anoxia = Area_m2/area.full)%>%
+  dplyr::select(LakeID, year, areal_anoxia, depth_ratio)%>%
+  rename(Year=year)
+
+#maxdepths is the depth of the lake
+#Depth_m is the top depth below the anoxia threshhold in a given year (1m intervals)
+#Area_m2 is the area of the top of anoxia
+#area.full is the surface area of the lake
+
+write.csv(areal,"../Compiled data/anoxic_bathymetry.csv", row.names = F)
+
+#Lakes with funky oxygen profiles
+summer_layers%>%
+  filter(LakeID=="296", year(Date)==2001) #389, 5, 252, 296
+```

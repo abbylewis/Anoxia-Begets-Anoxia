@@ -1,0 +1,189 @@
+---
+title: "Compile data"
+author: "Abby Lewis"
+date: "2022-09-21"
+output: html_document
+---
+
+This document synthesizes all of the calculated data saved up to this point and outputs a file for later analyses. 
+
+Step 1: Load packages
+Step 2: Compile all in-lake data
+Step 3: Add climate data
+
+Step 1: Load packages
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(viridis)
+library(lubridate)
+```
+
+
+Step 2: Compile all in-lake data
+```{r}
+do_demand_points = read.csv("../Compiled data/VW oxygen demand points.csv")
+vhod5_points = read.csv("../Compiled data/VHOD5 points.csv")
+lat_long = read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/4/fadd3eaa25b5fdd1fc4efba70e660579")
+shape = read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/4/fadd3eaa25b5fdd1fc4efba70e660579")%>%
+  filter(!is.na(MeanDepth_m),
+         !is.na(MaximumDepth_m))%>%
+  mutate(VD = 3*MeanDepth_m/MaximumDepth_m)%>%
+  dplyr::select(LakeID,VD)
+summer_avgs = read.csv("../Compiled data/summer_averages_wi.csv")
+strat_avgs = read.csv("../Compiled data/stratified_averages.csv")%>%
+  dplyr::select(LakeID,Layer,Year,Chla_ugL,Chla_date,Temp_C,Temp_date,hypo_depth,DOC_mgL,TP_ugL,TN_ugL,buoyancy_freq, TP_date,TN_date,SA_vol_ratio)%>%
+  rename(strat_Temp_C = Temp_C,
+         strat_Temp_date = Temp_date,
+         strat_TP_ugL = TP_ugL,
+         strat_TN_ugL = TN_ugL,
+         strat_TP_date = TP_date,
+         strat_TN_date = TN_date,
+         strat_buoyancy_freq = buoyancy_freq)
+
+bathy_anox= read.csv("../Compiled data/anoxic_bathymetry.csv")
+
+summer_avgs_wide = summer_avgs%>%
+  dplyr::select(-Chla_ugL,-Chla_date,-DOC_mgL)%>%
+  full_join(strat_avgs)%>%
+  full_join(bathy_anox%>%mutate(Layer="HYPO"))%>%
+  full_join(do_demand_points%>%dplyr::select(DO_demand_mgLd, AHOD_mgLd,Year, LakeID)%>%mutate(Layer="HYPO"))%>%
+  full_join(vhod5_points%>%dplyr::select(VHOD5_mgLd, Year, LakeID)%>%mutate(Layer="HYPO"))%>%
+  unique()%>%
+  pivot_wider(names_from = Layer, values_from = c(TP_ugL, TP_date, DOC_mgL, DOC_date, DO_mgL, DO_date, Chla_ugL, Chla_date, strat_Temp_C, strat_Temp_date, Temp_C, Temp_date, TN_ugL, TN_date, DO_demand_mgLd, AHOD_mgLd, buoyancy_freq, areal_anoxia, depth_ratio, VHOD5_mgLd, hypo_depth, strat_TP_ugL, strat_TN_ugL, strat_TP_date, strat_TN_date, strat_buoyancy_freq,SA_vol_ratio))
+
+length(unique(summer_avgs_wide$LakeID))
+
+doc = summer_avgs%>%
+  dplyr::select(-Chla_ugL,-Chla_date,-DOC_mgL)%>%
+  full_join(strat_avgs)%>%
+  full_join(bathy_anox%>%mutate(Layer="HYPO"))%>%
+  full_join(do_demand_points%>%dplyr::select(DO_demand_mgLd, Year, LakeID)%>%mutate(Layer="HYPO"))%>%
+  full_join(vhod5_points%>%dplyr::select(VHOD5_mgLd, Year, LakeID)%>%mutate(Layer="HYPO"))%>%
+  filter(!is.na(DOC_mgL))
+length(unique(doc$LakeID))
+
+tn = summer_avgs%>%
+  dplyr::select(-Chla_ugL,-Chla_date,-DOC_mgL)%>%
+  full_join(strat_avgs)%>%
+  full_join(bathy_anox%>%mutate(Layer="HYPO"))%>%
+  full_join(do_demand_points%>%dplyr::select(DO_demand_mgLd, Year, LakeID)%>%mutate(Layer="HYPO"))%>%
+  full_join(vhod5_points%>%dplyr::select(VHOD5_mgLd, Year, LakeID)%>%mutate(Layer="HYPO"))%>%
+  filter(!is.na(TN_ugL))
+length(unique(tn$LakeID))
+```
+
+
+Step 3: Add climate data
+```{r}
+#Temperature
+climate = read.csv("../External data/historical_temp_output_era5.csv")
+climate_sum = climate%>%
+  mutate(Month = ifelse(Lat<0,Month+6,Month),
+         Year = ifelse(Month>12,Year+1,Year),
+         Month = ifelse(Month>12,Month-12,Month))%>%
+  group_by(LakeID, Year)%>%
+  mutate(n = n())%>%
+  filter(n==12)%>%
+  dplyr::summarize(mean_temp = mean(Temp_C),
+            temp_jan = unique(Temp_C[Month==1]),
+            temp_feb = unique(Temp_C[Month==2]),
+            temp_mar = unique(Temp_C[Month==3]),
+            temp_apr = unique(Temp_C[Month==4]),
+            temp_may = unique(Temp_C[Month==5]),
+            temp_jun = unique(Temp_C[Month==6]),
+            temp_july = unique(Temp_C[Month==7]),
+            temp_aug = unique(Temp_C[Month==8]),
+            temp_sep = unique(Temp_C[Month==9]),
+            temp_oct = unique(Temp_C[Month==10]),
+            temp_nov = unique(Temp_C[Month==11]),
+            temp_dec = unique(Temp_C[Month==12]),
+            Lat = unique(Lat),
+            Lon = unique(Lon))
+
+#Precipitation
+precip = read.csv("../External data/historical_precip_output_era5.csv")
+precip_sum = precip%>%
+  mutate(Month = ifelse(Lat<0,Month+6,Month),
+         Year = ifelse(Month>12,Year+1,Year),
+         Month = ifelse(Month>12,Month-12,Month))%>%
+  group_by(LakeID, Year)%>%
+  mutate(n = n())%>%
+  filter(n==12)%>%
+  dplyr::summarize(mean_precip = mean(Total_Precip),
+            precip_jan = Total_Precip[Month==1],
+            precip_feb = Total_Precip[Month==2],
+            precip_mar = Total_Precip[Month==3],
+            precip_apr = Total_Precip[Month==4],
+            precip_may = Total_Precip[Month==5],
+            precip_jun = Total_Precip[Month==6],
+            precip_july= Total_Precip[Month==7],
+            precip_aug = Total_Precip[Month==8],
+            precip_sep = Total_Precip[Month==9],
+            precip_oct = Total_Precip[Month==10],
+            precip_nov = Total_Precip[Month==11],
+            precip_dec = Total_Precip[Month==12],
+            Lat = unique(Lat),
+            Lon = unique(Lon))
+
+with_temp_all = summer_avgs_wide%>%
+  left_join(climate_sum)%>%
+  left_join(precip_sum)
+
+#Lake 123 needs to be removed because it does not have the seasons we are studying in this analysis
+climate%>%
+  mutate(Month = ifelse(Lat<0,Month+6,Month),
+         Year = ifelse(Month>12,Year+1,Year),
+         Month = ifelse(Month>12,Month-12,Month))%>%
+  group_by(LakeID,Month,Lat)%>%
+  dplyr::summarize(Temp_C = mean(Temp_C))%>%
+  filter(Lat<0)%>%
+  ggplot(aes(x = Month,y=Temp_C, color = as.factor(LakeID)))+
+  geom_point()
+
+with_temp  = with_temp_all%>%
+  left_join(lat_long, by = c("LakeID"))%>%
+  filter(MaximumDepth_m>6.4,
+         !LakeID=="123",#No clear seasons
+         !LakeID=="387")#Hypolimnetic oxygenation
+
+write.csv(with_temp,"../Compiled data/All_data_annual.csv",row.names =F)
+```
+
+
+Step 4: Plot climate data
+```{r}
+labs = c("N:     Jan\nS:      Jul","Feb\nAug","Mar\nSep","Apr\nOct","May\nNov","Jun\nDec","Jul\nJan","Aug\nFeb","Sep\nMar","Oct\nApr","Nov\nMay","Dec\nJun")
+climate_plot = climate%>%
+  dplyr::select(-Lat,-Lon)%>%
+  left_join(lat_long, by = c("LakeID"))%>%
+  filter(MaximumDepth_m>6.4,
+         !LakeID=="123")%>%
+  mutate(Month = ifelse(Latitude_DD<0,Month+6,Month),
+         Year = ifelse(Month>12,Year+1,Year),
+         Month = ifelse(Month>12,Month-12,Month),
+         Region = ifelse(abs(Latitude_DD)<=40,"subtropical",
+                         ifelse(abs(Latitude_DD)<=60,"temperate",
+                                ifelse(abs(Latitude_DD)>60,"cold",NA))),
+         Month = factor(Month, levels = 1:12,labels = labs))%>%
+  group_by(Month, Region)%>%
+  dplyr::summarize(Temp_C_sd = sd(Temp_C),
+                   Temp_C = mean(Temp_C),
+                   n = length(unique(LakeID)))%>%
+  mutate(Region = paste0(Region,"; n = ",n))
+
+climate_plot$Region = factor(climate_plot$Region, levels = levels(as.factor(climate_plot$Region))[c(1,3,2)])
+
+jpeg("../Figures/Air temp global.jpg", width = 6, height = 4, res = 300, units = "in")
+climate_plot%>%
+  ggplot(aes(x = as.factor(Month),y=Temp_C, color = Region, group = Region))+
+  geom_point(position = position_dodge(width = .5))+
+  scale_color_manual(values = c("#1BE7FF","#EF767A","#404E5C"))+
+  geom_errorbar(aes(ymin=Temp_C-Temp_C_sd,ymax = Temp_C+Temp_C_sd), position = position_dodge(width=.5))+
+  theme_bw()+
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_text(hjust = ifelse(levels(climate_plot$Month) == "N:     Jan\nS:      Jul", .8, .5)))+
+  ylab("Air temperature ± SD (ºC)")
+dev.off()
+```
+

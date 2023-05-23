@@ -1,0 +1,135 @@
+---
+title: "Data characterization"
+author: "Abby Lewis"
+date: "2023-05-22"
+output: html_document
+---
+
+Step 1: Load packages and compiled data
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(viridis)
+library(lubridate)
+
+#Load saved data
+with_temp = read.csv("../Compiled data/All_data_annual.csv")
+```
+
+
+Step 2: Summarize data duration. NOTE this is for years with HYPO or EPI data of interest. Total duration stats for paper are from "03 Stratified avgs.Rmd"
+```{r}
+min(with_temp$Year)
+max(with_temp$Year)
+jpeg("../Figures/Data duration.jpg", width = 6, height = 4, res = 300, units = "in")
+with_temp%>%
+  ggplot(aes(x = Year))+
+  ylab("Number of lakes")+
+  geom_histogram(binwidth=1)+
+  theme_bw()
+dev.off()
+
+years = with_temp%>%
+  filter(!is.na(Temp_C_HYPO)|
+           !is.na(Temp_C_EPI)|
+           !is.na(DO_mgL_HYPO)|
+           !is.na(DO_mgL_EPI)|
+           !is.na(Chla_ugL_EPI)|
+           !is.na(TP_ugL_HYPO)|
+           !is.na(TP_ugL_EPI))%>%
+  group_by(LakeID)%>%
+  dplyr::summarise(n_year = length(unique(Year)))
+median(years$n_year)
+min(years$n_year)
+max(years$n_year)
+length(unique(with_temp$LakeID))
+```
+
+
+Step 2: Map distribution of lakes
+```{r}
+library(ggthemes)
+library(sf)
+library(rnaturalearth)
+library(rnaturalearthdata)
+#remotes::install_github("ropensci/rnaturalearthhires")
+library(rnaturalearthhires)
+library(ggspatial)
+
+#Create a world map of the sites in this analysis
+world <- ne_countries(scale = "medium", returnclass = "sf")
+for_map <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/4/fadd3eaa25b5fdd1fc4efba70e660579")
+
+jpeg("../Figures/World Map - just points.jpg", res = 300, width = 6, height = 3.2, units = "in")
+world_map = ggplot(data = world) +
+  geom_sf() +
+  coord_sf(expand = FALSE)+
+  geom_point(data = for_map, aes(Longitude_DD, Latitude_DD), fill = "red",shape = 21, color = "white", size = 2, alpha  =.5, stroke = .4)+
+  theme_bw()+
+  annotation_north_arrow(location = "bl", which_north = "true", 
+      pad_x = unit(0.75, "in"), pad_y = unit(0.5, "in"),
+      style = north_arrow_fancy_orienteering) +
+  theme(plot.margin = margin(0, 0, 0, 0, "cm"),
+    legend.box.background = element_rect(fill = "white", color = "white"))+
+  scale_fill_viridis(name = "Years of data")+
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank())
+world_map
+dev.off()
+
+jpeg("../Figures/US Map - just points.jpg", res = 300, width = 6, height = 3, units = "in")
+for_states <- for_map%>%
+  filter(Country == "USA")
+states <- ne_states(returnclass = "sf",country = "United States of America")
+us_map = ggplot(data = states) +
+  geom_sf() +
+  coord_sf(expand = FALSE, ylim = c(25, 50), xlim = c(-130,-60))+
+  geom_point(data = for_states, aes(Longitude_DD, Latitude_DD), fill = "red",shape = 21, color = "white", size = 2.8, alpha  =.2, stroke = .4)+
+  theme_bw()+
+  annotation_north_arrow(location = "bl", which_north = "true", 
+      pad_x = unit(0.2, "in"), pad_y = unit(0.2, "in"),
+      style = north_arrow_fancy_orienteering) +
+  theme(plot.margin = margin(0, 0, 0, 0, "cm"),
+    legend.box.background = element_rect(fill = "white", color = "white"))+
+  scale_fill_viridis(name = "Years of data")+
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank())
+us_map
+dev.off()
+
+jpeg("../Figures/Euro Map - just points.jpg", res = 300, width = 4, height = 4, units = "in")
+euro_map = ggplot(data = world) +
+  geom_sf() +
+  coord_sf(expand = FALSE, ylim = c(35, 70), xlim = c(-12,40))+
+  geom_point(data = for_map, aes(Longitude_DD, Latitude_DD), fill = "red",shape = 21, color = "white", size = 2.8, alpha  =.5, stroke = .4)+
+  theme_bw()+
+  annotation_north_arrow(location = "bl", which_north = "true", 
+      pad_x = unit(0.2, "in"), pad_y = unit(0.2, "in"),
+      style = north_arrow_fancy_orienteering) +
+  theme(plot.margin = margin(0, 0, 0, 0, "cm"),
+    legend.box.background = element_rect(fill = "white", color = "white"))+
+  scale_fill_viridis(name = "Years of data")+
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank())
+euro_map
+dev.off()
+```
+
+Calculate n from each source
+```{r}
+lat_long = read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/4/fadd3eaa25b5fdd1fc4efba70e660579")
+length(unique(lat_long$LakeID))
+strat = lat_long%>%
+  filter(MaximumDepth_m>=6.4)
+strat%>%
+  filter(!is.na(as.numeric(LakeID)))
+strat%>%
+  filter(grepl("WI",LakeID))
+strat%>%
+  filter(grepl("NH",LakeID))
+strat%>%
+  filter(grepl("MIDAS",LakeID))
+strat%>%
+  filter(grepl("aba",LakeID))
+sum(lat_long$MaximumDepth_m<6.4,na.rm=T)
+```

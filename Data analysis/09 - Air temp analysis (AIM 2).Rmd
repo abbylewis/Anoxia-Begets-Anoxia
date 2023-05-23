@@ -1,0 +1,240 @@
+---
+title: "Air temp analysis"
+author: "Abby Lewis"
+date: "2023-05-22"
+output: html_document
+---
+
+This file analyzes the effect of variation in air temperature on hypolimnetic temperature and DO. 
+
+Step 1: Load packages and data
+Step 2: Generate temp anomaly summary fig
+Step 3: Analyze the effect of monthly air temperature on hypolimnetic DO, VHOD, and temp dynamics
+
+Step 1: Load packages and data
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(lubridate)
+library(mosaic)
+library(ggallin)
+library(ppcor)
+library(multcompView)
+library(ggpubr)
+library(viridis)
+library(MASS)
+
+#Load saved data
+with_temp = read.csv("../Compiled data/All_data_annual.csv")
+```
+
+Step 2: Generate temp anomaly summary fig
+```{r}
+zscore = function(data, na.rm = T){(data-mean(data, na.rm = na.rm))/sd(data, na.rm = na.rm)}
+do_anomaly_stat =with_temp%>%
+  group_by(LakeID)%>%
+  mutate(hypo_do_anom = DO_mgL_HYPO-mean(DO_mgL_HYPO, na.rm = T),
+         spr_temp = (temp_mar+temp_apr)/2,
+         spr_temp_anom = spr_temp - mean(spr_temp, na.rm = T))
+
+cor_data = do_anomaly_stat%>%
+  dplyr::select(hypo_do_anom,spr_temp_anom,Year)%>%
+  na.omit()
+
+pcor.test(cor_data$hypo_do_anom, cor_data$spr_temp_anom,cor_data$Year,method = "spearman")$estimate
+
+jpeg("../Figures/DO and air temp anomaly - spring.jpg", width = 5, height = 3, res = 300, units = "in")
+do_air_sum = do_anomaly_stat%>%
+  filter(!is.na(spr_temp_anom),
+         !is.na(hypo_do_anom))%>%
+  group_by(LakeID)%>%
+  mutate(hypoxic = ifelse(max(DO_mgL_HYPO,na.rm = T)<1,"y","n"))%>%
+  ungroup()%>%
+  filter(hypoxic=="n")%>%
+  mutate(temp_anom_sum = ifelse(spr_temp_anom>0.6,"> 0.6",
+                                ifelse(spr_temp_anom<(-0.6),"< -0.6","between -0.6 \nand 0.6")),
+         temp_anom_sum = factor(temp_anom_sum, levels = c("< -0.6", "between -0.6 \nand 0.6", "> 0.6")),
+         do_anom_sum = ifelse(hypo_do_anom>0.2,"> 0.2",
+                                ifelse(hypo_do_anom<(-0.2),"< -0.2","between -0.2 \nand 0.2")),
+         do_anom_sum = factor(do_anom_sum, levels = c("> 0.2", "between -0.2 \nand 0.2", "< -0.2")))%>%
+  group_by(temp_anom_sum)%>%
+  mutate(n=n())
+length(unique(do_air_sum$LakeID))
+do_air_sum%>%
+  group_by(temp_anom_sum)%>%
+  mutate(temp_n = n())%>%
+  group_by(temp_anom_sum,do_anom_sum)%>%
+  dplyr::summarize(do_n = n(),
+            pct = do_n/unique(temp_n)*100)
+do_air_sum%>%
+  ggplot(aes(fill = do_anom_sum, x = temp_anom_sum))+
+  geom_bar(position = "fill")+
+  geom_hline(yintercept = .5, color = "grey80",lty = "dashed")+
+  geom_text(aes(y = .9, label = paste0("n = ",n)), color = "grey50")+
+  labs(fill="Hypolimnetic \nDO anomaly (mg/L)")+
+  xlab("Spring air temperature anomaly (ºC)")+
+  ylab("Percent of lake-years")+
+  scale_y_continuous(labels = scales::percent)+
+  theme_bw()+
+  scale_fill_viridis(discrete=T, direction = -1)
+dev.off()
+```
+
+
+Step 3: Analyze the effect of monthly air temperature on hypolimnetic DO, VHOD, and temp dynamics
+```{r}
+many_lake_temp_sum = with_temp%>%
+  pivot_longer(cols = contains("temp", ignore.case = F), names_to = "mon")%>%
+  filter(!mon=="mean_temp")%>%
+  mutate(mon = month(as.Date(paste0("2022-",substr(mon,6,8),"-01"), format = "%Y-%b-%d")),
+         Year = ifelse(mon>=9,Year+1,Year))
+
+# DO
+many_lake_stat = many_lake_temp_sum%>%
+  filter(!is.na(DO_mgL_HYPO),!is.na(mon), !is.na(value))%>%
+  group_by(LakeID)%>%
+  mutate(hypoxic = ifelse(max(DO_mgL_HYPO)<1,"yes","no"))%>%
+  filter(hypoxic=="no")%>%
+  group_by(LakeID, mon)%>%
+  mutate(nyear = length(unique(Year)))%>%
+  filter(nyear>=10,
+         #max(value)-min(value)>2
+         )%>%
+  dplyr::summarize(do_temp = pcor.test(DO_mgL_HYPO,value,Year,method = "spearman")$estimate,
+            )
+
+labs = c("N:     Sep\nS:     Mar","Oct\nApr","Nov\nMay","Dec\nJun","Jan\nJul","Feb\nAug","Mar\nSep","Apr\nOct","May\nNov","Jun\nDec","Jul\nJan","Aug\nFeb")
+
+anova_res = aov(do_temp~as.factor(mon),data=many_lake_stat)
+summary(anova_res)
+tukey = TukeyHSD(anova_res)
+cld = multcompLetters4(anova_res,tukey)$`as.factor(mon)`$Letters
+cld_df = data.frame(cld = cld, mon = names(cld))%>%
+  mutate(mon = factor(as.numeric(mon), levels = c(9:12,1:8), labels = labs))
+
+
+jpeg("../Figures/DO and temp by month.jpg", width = 6, height = 4, res = 300, units = "in")
+do_temp_data = many_lake_stat%>%
+  group_by(mon)%>%
+  mutate(p = wilcox.test(do_temp)$p.value,
+         n = n(),
+         mon = factor(mon, levels = c(9:12,1:8),labels = labs))
+do_temp = do_temp_data%>%
+  ggplot(aes(x=mon, y = do_temp))+
+  geom_boxplot(aes(color=p<0.001))+
+  geom_text(aes(x = mon, label = cld, y = 1.08),
+            data = cld_df)+
+  #geom_text(aes(label = paste0("n = ",n), y = max(do_temp)))+ #n is the same across all
+  geom_hline(yintercept=0)+
+  ylim(-1,1.08)+
+  xlab("Air temp. month")+
+  ylab(paste0("Correlation with\nlate-summer DO\n(n = ",unique(do_temp_data$n),")"))+
+  theme_bw()+
+  scale_color_manual(values = c("grey50","#FB8B24"))+
+  theme(axis.text.x = element_text(hjust = ifelse(levels(do_temp_data$mon) == "N:     Sep\nS:     Mar", .8, .5)))
+do_temp
+dev.off()
+
+
+######## Hypo temp
+# Stratified hypo temp
+
+many_lake_stat = many_lake_temp_sum%>%
+  filter(!is.na(strat_Temp_C_HYPO),!is.na(mon), !is.na(value))%>%
+  group_by(LakeID, mon)%>%
+  mutate(nyear = length(unique(Year)))%>%
+  filter(nyear>=10,
+         #max(value)-min(value)>2
+         )%>%
+  dplyr::summarize(temp_temp = pcor.test(strat_Temp_C_HYPO,value,Year,method = "spearman")$estimate,
+            )
+anova_res = aov(temp_temp~as.factor(mon),data=many_lake_stat)
+summary(anova_res)
+tukey = TukeyHSD(anova_res)
+cld = multcompLetters4(anova_res,tukey)$`as.factor(mon)`$Letters
+cld_df = data.frame(cld = cld, mon = names(cld))%>%
+  mutate(mon = factor(as.numeric(mon), levels = c(9:12,1:8), labels = labs))
+
+temp_temp_data = many_lake_temp_sum%>%
+  group_by(LakeID, mon)%>%
+  filter(!is.na(strat_Temp_C_HYPO),!is.na(mon), !is.na(value))%>%
+  mutate(nyear = length(unique(Year)))%>%
+  filter(nyear>=10,
+         #max(value)-min(value)>2
+         )%>%
+  dplyr::summarize(temp_temp = pcor.test(strat_Temp_C_HYPO,value,Year,method = "spearman")$estimate,
+            )%>%
+  group_by(mon)%>%
+  mutate(p = wilcox.test(temp_temp)$p.value,
+         n = n(),
+         mon = factor(mon, levels = c(9:12,1:8), labels = labs))
+unique(temp_temp_data$LakeID)
+
+jpeg("../Figures/Air and strat hypo temp by month.jpg", width = 6, height = 4, res = 300, units = "in")
+temp_temp = temp_temp_data%>%
+  ggplot(aes(x=mon, y = temp_temp))+
+  geom_boxplot(aes(color=p<0.001))+
+  geom_text(aes(x = mon, label = cld, y = 1.08),
+            data = cld_df)+
+  geom_hline(yintercept=0)+
+  xlab("Air temp. month")+
+  ylab(paste0("Correlation with\nstratified average hypo.\ntemp. (n = ",unique(temp_temp_data$n),")"))+
+  theme_bw()+
+  ylim(-1,1.08)+
+  scale_color_manual(values = c("grey50","#FB8B24"))+
+  theme(axis.text.x = element_text(hjust = ifelse(levels(temp_temp_data$mon) == "N:     Sep\nS:     Mar", .8, .5)))
+temp_temp
+dev.off()
+
+many_lake_stat = many_lake_temp_sum%>%
+  filter(!is.na(DO_demand_mgLd_HYPO),!is.na(mon), !is.na(value))%>%
+  group_by(LakeID, mon)%>%
+  mutate(nyear = length(unique(Year)))%>%
+  filter(nyear>=10,
+         #max(value)-min(value)>2
+         )%>%
+  dplyr::summarize(temp_demand = pcor.test(DO_demand_mgLd_HYPO,value,Year,method = "spearman")$estimate,
+            )
+anova_res = aov(temp_demand~as.factor(mon),data=many_lake_stat)
+summary(anova_res)
+tukey = TukeyHSD(anova_res)
+cld = multcompLetters4(anova_res,tukey)$`as.factor(mon)`$Letters
+cld_df = data.frame(cld = cld, mon = names(cld))%>%
+  mutate(mon = factor(as.numeric(mon), levels = c(9:12,1:8), labels = labs))
+
+jpeg("../Figures/Demand and air temp by month.jpg", width = 6, height = 4, res = 300, units = "in")
+temp_demand_data = many_lake_temp_sum%>%
+  group_by(LakeID, mon)%>%
+  filter(!is.na(DO_demand_mgLd_HYPO),!is.na(mon), !is.na(value))%>%
+  mutate(nyear = length(unique(Year)))%>%
+  filter(nyear>=10,
+         #max(value)-min(value)>2
+         )%>%
+  dplyr::summarize(demand_temp = pcor.test(DO_demand_mgLd_HYPO,value,Year,method = "spearman")$estimate,
+            )%>%
+  group_by(mon)%>%
+  mutate(p = wilcox.test(demand_temp)$p.value,
+         n = n(),
+         mon = factor(mon, levels = c(9:12,1:8),labels = labs))
+   
+temp_demand = temp_demand_data%>%
+  ggplot(aes(x=mon, y = demand_temp))+
+  geom_boxplot(aes(color=p<0.001))+
+  geom_text(aes(x = mon, label = cld, y = 1.08),
+            data = cld_df)+
+  geom_hline(yintercept=0)+
+  xlab("Air temp. month")+
+  ylab(paste0("\nCorrelation with\nVHOD (n = ",unique(temp_demand_data$n),")"))+
+  theme_bw()+
+  ylim(-1,1.08)+
+  scale_color_manual(values = c("grey50","#FB8B24"))+
+  theme(axis.text.x = element_text(hjust = ifelse(levels(temp_demand_data$mon) == "N:     Sep\nS:     Mar", .8, .5)))
+temp_demand
+dev.off()
+
+jpeg("../Figures/Monthly correlations.jpg", width = 5, height = 8, res = 300, units = "in")
+ggarrange(temp_temp+theme(axis.title.x = element_blank()),temp_demand+theme(axis.title.x = element_blank()),do_temp,
+          common.legend = T, legend = "bottom",nrow=3, labels = "auto", align = "hv")
+dev.off()
+```
+

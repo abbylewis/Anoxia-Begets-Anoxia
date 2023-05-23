@@ -1,0 +1,76 @@
+,country,lat,long,elevation,max_depth,surf_area,ID,name.x,state_prov,Chla_ugL,UniqueLakeName,Notes
+1,Greece,32.8106,35.5941,-215,42,16500,aba03,Lake Kinneret,NA,0,L0502,
+2,USA,38.368889,-97.085,413,8.5,3.4,aba28,Marion,NA,0,,Can't find this lake
+3,USA,39.083333,-96.897778,348.8,18,7.4,aba29,Milford,NA,0,L8596,
+4,USA,45.34695,-119.54463,632.9,26,6.81,aba14,Willow Creek Reservoir,NA,0,L9236,
+5,Austria,47.194916,10.888754,913,25.2,14,aba02,Piburger See,NA,0,,Can't find this lake
+6,USA,37.48,-94.2617,293,7.9,2.6,aba17,Lamar,NA,0,L11112,
+10,USA,46.21,-89.47,512,18.5,5.030444563,aba01,Crampton,NA,0,L6144,
+11,USA,46.23,-89.49,514,14.02,4.038372726,aba21,East Long,NA,0,,Can't find this lake
+12,USA,46.24,-89.5,518,7.62,3.435175304,aba22,Hummingbird,NA,0,,Can't find this lake
+13,USA,46.25,-89.52,506,6.7,2.421926506,aba18,Morris,NA,0,L10662,"It points to land, but I found a very close lat and long and I think it could be it, but I'll flag this one"
+14,USA,46.23,-89.5,514,14.02,3.89140746,aba23,West Long,NA,0,,Pointing to land so hard to distinguish this point
+17,Canada,54.10222,-106.4517,577,48,23,aba09,Kinsgmere Lake,NA,0,,Can't find this lake
+18,Norway,60.371,9.727,516,12,2,aba16,Langtjern,NA,0,,Can't find this lake
+23,USA,44.47917371,-69.78916919,234,NA,NA,aba12,Messalonskee Lake,NA,0,L4103,
+24,USA,44.47917371,-69.78916919,234,NA,NA,aba13,Messalonskee Lake,NA,0,L4103,Same as the lake above
+25,USA,44.52752814,-69.77964817,277,NA,NA,aba35,SalmonLake,NA,0,L4127,
+58,USA,44.39860348,-69.82684064,270,34,9.307778,aba52,Gould Pond,NA,0,L11979,
+82,Canada,45.190056,-79.465694,246,11,3.4,aba 37,Three Mile,NA,0,,Can't find this lake
+85,USA,37.044189,-80.863604,658,15,NA,aba34,Gatewood Reservoir,NA,0,L0851,
+88,Germany,52.438,13.65,38,8,730,3,Mueggelsee,Berlin,0,L7936,
+120,USA,48.3059,-99.1725,441,0,0,39,Irvine,North Dakota,0,L8573,
+132,USA,43.8169,-74.8561,557,21.3,512.5,56,Big Moose,New York,0,L12092,
+134,USA,43.682,-74.4886,659,4.6,2.8,58,Carry,New York,0,L12508,
+135,USA,43.7891,-74.812,556,6.1,40.4,59,Cascade,New York,0,L12098,
+136,USA,43.831,-74.8064,584,4,20.6,60,Constable,New York,0,L12734,
+138,USA,43.4171,-74.6339,619,9.8,32.2,62,G,New York,0,L12155,
+139,USA,43.693,-75.0608,548,5.2,5.3,63,Grass,New York,0,L12403,
+140,USA,43.6229,-74.7607,656,10.7,33.2,64,Indian,New York,0,L12452,
+141,USA,43.3028,-74.5914,598,11.3,17.3,65,Jockeybush,New York,0,L12828,
+142,USA,43.713,-74.8125,576,21.9,186.9,66,Limekiln,New York,0,L12659,
+143,USA,43.8379,-74.479,573,4,1.7,67,Long,New York,0,L12794,
+144,USA,43.7814,-74.853,536,15.2,45.7,68,Moss,New York,0,L12608,
+145,USA,43.5278,-74.9396,554,17.7,176.8,69,North,New York,0,L12024,
+146,USA,43.7609,-74.9159,525,10.1,90.5,70,Rondaxe,New York,0,L11395,
+149,USA,43.511,-74.8759,615,18.3,197.4,73,South,New York,0,L12864,
+152,US,43.4039,-72.0438,333,33.7,1673.8,78,Sunapee 200,New Hampshire,0,,Can't find this lake
+173,Switzerland,47.123,9.223,419,151,2410,99,Walensee,NA,0,,Can't find this lake
+174,Switzerland,47.285,8.591,406,136,6660,100,Zurich,NA,0,L7146,
+175,Switzerland,46.904,6.843,429,153,21500,101,Neuchatel,NA,0,L6867,
+176,Switzerland,46.441,6.6,372,310,58010,102,Geneva,NA,0,L6248,
+177,Switzerland,47.629,9.374,396,252,53600,103,Constance,NA,0,L7568,
+178,Switzerland,47.104,7.198,429,74,3776,104,Biel,NA,0,L7055,
+180,Canada,50.65,-105.5,509,5.5,2910,106,Buffalo Pound,Saskatchewan,0,,Can't find this lake
+198,France,45.8574,6.1735,450,64.7,2650,127,Annecy (grand lac),Haute-Savoie,0,,Can't find this lake
+205,USA,43.1692,-88.32,292,12.8,95.1,135,Keesus,Wisconsin,0,L9054,
+206,USA,42.5233,-88.2567,239,10.06,132.3,136,Mary,Wisconsin,0,L10931,
+209,USA,42.9842,-88.5033,260,2.44,49.4,139,School Section,Wisconsin,0,,The lat and long doesn't match the lake outlined
+215,USA,45.2162,-67.609,62,7.62,246.2,145,Long,Maine,0,L4960,
+318,USA,43.4547,-72.0234,475,NA,NA,250,Dutchman Pond,NH,0,L3395,
+333,USA,43.4095,-72.1165,330,NA,NA,265,Perkins Pond,NH,0,L3375,
+359,Sweden,NA,NA,NA,5,38,292,N Sarnamannasjon,Dalarna,0,,There is no lat and long for this
+360,Sweden,NA,NA,NA,6,24,293,O Sarnamannasjon,Dalarna,0,,There is no lat and long for this
+373,USA,44.5861,-73.3745,33,122,126909,306,Champlain - Main Lake,Vermont,0,L3454,
+377,USA,46.7742,-95.8911,405,17.7,512.6,310,SALLIE,Minnesota,0,L6746,
+379,USA,46.813,-95.8932,412,18.6,144.5,312,LONG,Minnesota,0,L6783,
+380,USA,46.8727,-95.8328,412,9.8,83,313,LITTLE FLOYD,Minnesota,0,L6849,
+381,USA,46.883,-95.8599,413,NA,NA,314,MUD,Minnesota,0,L6846,
+382,USA,46.7431,-95.907,405,13.1,750.6,315,MELISSA,Minnesota,0,L6724,
+390,USA,44.9409,-93.2562,251,6.1,4.5,323,POWDERHORN,Minnesota,0,L4544,
+392,USA,44.9211,-93.2362,249,9.4,21.9,325,HIAWATHA,Minnesota,0,L4515,
+393,USA,44.9075,-93.2405,249,10.1,82.6,326,NOKOMIS,Minnesota,0,L4497,
+394,USA,44.9399,-93.3104,261,27.4,170.4,327,CALHOUN,Minnesota,0,L4546,
+395,USA,44.9825,-93.3231,250,7.6,15,328,WIRTH,Minnesota,0,L4615,
+405,USA,45.2014,-93.5053,271,2.1,165.1,338,DIAMOND,Minnesota,0,L12822,
+414,USA,44.9702,-93.2968,249,NA,NA,347,SPRING,Minnesota,0,L4601,
+415,USA,44.9691,-93.2843,249,NA,1.4,348,LORING (S. BAY),Minnesota,0,L4598,
+419,USA,45.0246,-93.058,263,2.7,29.1,352,KOHLMAN,Minnesota,0,L4681,
+421,USA,45.01,-93.0609,263,2.4,27.7,354,KELLER (MAIN),Minnesota,0,L4653,
+428,USA,45.0191,-93.1436,272,NA,16.6,361,BENNETT,Minnesota,0,L12344,
+430,USA,44.9799,-93.1411,269,4.9,28.5,363,COMO,Minnesota,0,L4611,
+440,USA,45.058,-93.1341,290,1.5,NA,373,ISLAND (BASIN N. OF I-694),Minnesota,0,L4735,
+451,USA,45.0687,-92.9739,283,25.3,1046,384,WHITE BEAR,Minnesota,0,L12582,The lake seems to be connected to the original one
+460,USA,34.8609,-92.5021,92,NA,3600,393,Lake Maumelle at Natural Steps,Arkansas,0,L8616,
+501,USA,38.8458,-93.7779,223,11.58,28.7,437,Hazel Hill,Missouri,0,L1160,
+502,USA,38.5911,-92.8072,261,13.11,31.2,438,Manito,Missouri,0,,Can't find this lake

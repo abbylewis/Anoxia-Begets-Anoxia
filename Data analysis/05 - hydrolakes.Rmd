@@ -1,0 +1,35 @@
+---
+title: "Hydrolakes"
+author: "Abby Lewis"
+date: "2023-03-23"
+output: html_document
+---
+
+This file compiles hydrolakes metadata using unique hydrolakes IDs
+
+Step 1: Load packages
+Step 2: Add hydrolakes data
+
+
+Step 1: Load packages
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+#install.packages("foreign")
+library(foreign)
+```
+
+
+Step 2: Add hydrolakes data
+```{r}
+dbf = read.dbf("../External data/HydroLAKES_points_v10_shp/HydroLAKES_points_v10.dbf")
+
+ids = read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/4/fadd3eaa25b5fdd1fc4efba70e660579")%>%
+  select(LakeID,hylak_id)%>%
+  rename(ID = LakeID)
+
+comb = ids%>%
+  left_join(dbf, by = c("hylak_id"="Hylak_id"))
+
+write.csv(comb,"../External data/hydrolakes_full.csv")
+```
