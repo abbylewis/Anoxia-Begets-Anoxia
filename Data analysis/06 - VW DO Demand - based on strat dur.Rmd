@@ -23,6 +23,8 @@ library(openair)
 #Load data and stratification boundaries. This file is created by "03 - Stratified avgs.Rmd"
 full_with_thermo = read.csv("../Compiled data/Stratified_period_data_with_thermo.csv")%>%
   mutate(Date=as.Date(Date))
+#Load lake metadata
+lat_long = read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/4/fadd3eaa25b5fdd1fc4efba70e660579")
 ```
 
 Step 2: Calculate the rate of change in volume-weighted oxygen concentrations during the stratified period at each lake (VHOD)
