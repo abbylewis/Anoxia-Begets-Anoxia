@@ -22,11 +22,33 @@ Chlorophyll-a, dissolved oxygen, phosphorus, spring air temperature
 
 ### ./Data analysis
 
-All data analysis scripts, in numerical order
+All data analysis scripts:
+* 01 - Load climate - ERA5.Rmd
+    * Load netcdf of global climate data and output a csv with air temperature records at each lake
+* 02 - Temp and DO interpolation.Rmd
+    * Interpolate temperature and oxygen profiles to a 1 m depth resolution
+* 03 - Stratified avgs.Rmd
+    * Calculate epilimnetic and hypolimnetic means during the stratified period of each year. Add in additional chlorophyll-a data using "chla_harmonizer.csv"
+* 04 - Summer avgs.Rmd
+    * Calculate epilimnetic and hypolimnetic means during the late-summer period of each year
+* 05 - hydrolakes.Rmd
+    * Load all hydrolakes data and output a csv with hydrolakes metadata for each lake
+* 06 - VW DO Demand - based on strat dur.Rmd
+    * Calculate volume-weighted hypolimnetic oxygen demand for each lake-year
+* 07 - Compile data.Rmd
+    * Combine late-summer and stratified means with oxygen demand, and climate data. Output a file for following analyses.
+* 08 - Data characterization.Rmd
+    * Characterize the full, synthesized dataset. Output summary figures
+* 09 - Air temp analysis (AIM 2).Rmd
+    * Analyze the effects of changing monthly air temperatures on hypolimnetic temperature and oxygen dynamics
+* 10 - Lags.Rmd
+    * Analyze the relevant lags for each relationship in the anoxia-begets-anoxia (ABA) feedback
+* 11 - Regressions.Rmd
+    * Perform regression analyses within and across lakes to characterize the ABA feedback. Functions for this analysis are in "lmer_functions.R"
 
 ### ./External data
 
-Downloaded data (unmodified from original source
+Downloaded data (unmodified from original sources)
 
 ### ./Compiled data
 
