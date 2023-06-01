@@ -32,7 +32,7 @@ library(tidyverse)
 library(lubridate)
 source("lmer_functions.R")
 
-POSTER=F
+POSTER=F #Should figures be designed for a poster? Or for the manuscript
 
 #Load saved data
 with_temp = read.csv("../Compiled data/All_data_annual.csv")
@@ -499,6 +499,7 @@ means = with_temp%>%
                    mean_epi_p = mean(TP_ugL_EPI,na.rm=T),
                    sd_epi_p = sd(TP_ugL_EPI,na.rm=T),
                    cv_epi_p = unique(sd_epi_p)/unique(mean_epi_p),
+                   mean_epi_n = mean(TN_ugL_EPI,na.rm=T),
                    mean_demand = mean(DO_demand_mgLd_HYPO,na.rm=T),
                    sd_demand = sd(DO_demand_mgLd_HYPO,na.rm=T),
                    cv_demand = unique(sd_demand)/unique(mean_demand),
@@ -524,7 +525,8 @@ for_mlr = incomplete%>%
          log_epiP = log(mean_epi_p),
          log_hypoP = log(mean_hypo_p),
          SA_depth = log_SurfaceArea_ha/log_MaximumDepth_m,
-         Lake_type = factor(Lake_type))
+         Lake_type = factor(Lake_type),
+         tn_tp_ratio = mean_epi_n/mean_epi_p)
 
 potential_drivers = c("log_MeanDepth_m",
                       "log_MaximumDepth_m",
@@ -543,15 +545,19 @@ potential_drivers = c("log_MeanDepth_m",
                       "log_SurfaceArea_ha",
                       "log_Res_time",
                       "Elevation_m",
-                      "log_epiP")
+                      "log_epiP"
+                      #"tn_tp_ratio" #removing for the sake of having a standardized approach
+                      )
 responses = c("strat_TP_ugL_EPI")
 aic_calculator_onevar(for_mlr,responses,potential_drivers)
-summary(lm(strat_TP_ugL_EPI~log_epiP, data = for_mlr)) #Take home: epi P has a positive relationship
+summary(lm(strat_TP_ugL_EPI~tn_tp_ratio, data = for_mlr)) #Take home: epi P has a positive relationship
 
 jpeg("../Figures/Effect of TP on chl-a.jpg", width = 4, height = 4, res = 300, units = "in")
 chla = for_mlr%>%
   filter(!is.na(strat_TP_ugL_EPI))%>%
-  ggplot(aes(x=mean_epi_p,y=strat_TP_ugL_EPI))+
+  #mutate(ratio = ifelse(tn_tp_ratio>44,"P limited",
+  #                      ifelse(tn_tp_ratio<12,"N limited","co-limited")))%>%
+  ggplot(aes(x=mean_epi_p,y=strat_TP_ugL_EPI))+ #, color = ratio
   geom_point()+
   scale_x_log10()+
   geom_hline(yintercept = 0)+
@@ -561,6 +567,50 @@ chla = for_mlr%>%
   xlab("Mean epilimnetic TP (µg/L)")
 chla
 dev.off()
+
+jpeg("../Figures/Effect of TP on chl-a - TNTP ratio.jpg", width = 6, height = 4, res = 300, units = "in")
+for_mlr%>%
+  filter(!is.na(strat_TP_ugL_EPI))%>%
+  mutate(ratio = ifelse(tn_tp_ratio>44,"P limited (TN:TP > 44)",
+                        ifelse(tn_tp_ratio<12,"N limited (TN:TP < 12)","Co-limited")),
+         ratio = ifelse(is.na(ratio),"Insufficient data",ratio),
+         ratio = factor(ratio,levels = c("N limited (TN:TP < 12)","Co-limited","P limited (TN:TP > 44)","Insufficient data")))%>%
+  ggplot(aes(x=mean_epi_p,y=strat_TP_ugL_EPI, color = ratio))+
+  geom_point()+
+  scale_x_log10()+
+  geom_hline(yintercept = 0)+
+  geom_smooth(method = "lm", color = "black")+
+  theme_bw()+
+  theme(legend.title = element_blank())+
+  ylab("Coefficient for the effect\nof epi. TP on chl-a")+
+  xlab("Mean epilimnetic TP (µg/L)")
+dev.off()
+
+jpeg("../Figures/TP mean and SD.jpg", width = 4, height = 4, res = 300, units = "in")
+for_mlr%>%
+  filter(!is.na(mean_epi_p),
+         !is.na(sd_epi_p))%>%
+  ggplot(aes(x=mean_epi_p,y=sd_epi_p))+
+  geom_point()+
+  scale_x_log10()+
+  scale_y_log10()+
+  theme_bw()+
+  ylab("SD")+
+  xlab("Mean epi. TP (µg/L)")+
+  ylab("SD epi. TP (µg/L)")
+dev.off()
+
+for_mlr%>%
+  filter(!is.na(mean_epi_p),
+         !is.na(cv_epi_p))%>%
+  ggplot(aes(x=mean_epi_p,y=cv_epi_p))+
+  geom_point()+
+  scale_x_log10()+
+  geom_smooth(method = "lm",color = "black")+
+  theme_bw()+
+  ylab("SD")+
+  xlab("Mean epi. TP (µg/L)")+
+  ylab("CV epi. TP (µg/L)")
 
 potential_drivers = c("log_MeanDepth_m",
                       "log_MaximumDepth_m",
