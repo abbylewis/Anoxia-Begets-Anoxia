@@ -113,7 +113,7 @@ unclean = to_profiles%>%
 unclean_plot = unclean%>%
   ggplot(aes(x = reported_max_depth,y=pct_sampled))+
   geom_point(alpha = 0.3, color = "blue")+
-  geom_text(aes(x=3.05,y=180,label = paste0(
+  geom_text(aes(x=3.05,y=190,label = paste0(
     "Mean: ",round(unique(mean_pct_sampled),1),"%",
     "\nMedian: ",round(unique(median_pct_sampled),1),"%",
     "\nn: ",unique(n_lakes)," lakes"
@@ -123,12 +123,13 @@ unclean_plot = unclean%>%
   coord_trans(x="log10")+
   ggtitle("Before cleaning process")+
   ylab("Mean percent of the\nwater column sampled")+
+  ylim(c(min(unclean$pct_sampled),200))+ #allow space for text
   xlab("Reported maximum depth")+
   theme(axis.title.x = element_blank())
 unclean_sd = unclean%>%
   ggplot(aes(x = reported_max_depth,y=sd_max))+
   geom_point(alpha = 0.3, color = "blue")+
-  geom_text(aes(x=3.05,y=13,label = paste0(
+  geom_text(aes(x=3.05,y=45,label = paste0(
     "Mean: ",round(unique(mean_sd_max),1),"m",
     "\nMedian: ",round(unique(median_sd_max),1),"m")), hjust = 0, vjust = 1)+
   #geom_hline(yintercept=100)+
@@ -163,13 +164,13 @@ clean = test_depth_removal%>%
 clean_plot = clean%>%
   ggplot(aes(x = reported_max_depth,y=pct_sampled))+
   geom_point(alpha = 0.3, color = "blue")+
-  geom_text(aes(x=3.05,y=180,label = paste0(
+  geom_text(aes(x=3.05,y=190,label = paste0(
     "Mean: ",round(unique(mean_pct_sampled),1),"%",
     "\nMedian: ",round(unique(median_pct_sampled),1),"%",
     "\nn: ",unique(n_lakes)," lakes"
   )), hjust = 0, vjust = 1)+
   geom_hline(yintercept=100)+
-  ylim(c(min(unclean$pct_sampled),max(unclean$pct_sampled)))+
+  ylim(c(min(unclean$pct_sampled),200))+
   xlim(c(min(unclean$reported_max_depth),max(unclean$reported_max_depth)))+
   theme_bw()+
   coord_trans(x="log10")+
@@ -181,7 +182,7 @@ clean_plot = clean%>%
 clean_sd = clean%>%
   ggplot(aes(x = reported_max_depth,y=sd_max))+
   geom_point(alpha = 0.3, color = "blue")+
-  geom_text(aes(x=3.05,y=13,label = paste0(
+  geom_text(aes(x=3.05,y=45,label = paste0(
     "Mean: ",round(unique(mean_sd_max),1),"m",
     "\nMedian: ",round(unique(median_sd_max),1),"m")), hjust = 0, vjust = 1)+
   #geom_hline(yintercept=100)+
@@ -193,13 +194,13 @@ clean_sd = clean%>%
   xlab("Reported maximum depth")+
   theme(axis.title.y = element_blank())
 
-jpeg("../results/figures/depth_cleaning_all.jpg",res=300,width=6, height = 5, units = "in")
+jpeg("../Figures/depth_cleaning_all.jpg",res=300,width=6, height = 5, units = "in")
 ggarrange(unclean_plot,clean_plot, unclean_sd, clean_sd, labels = "auto",nrow=2, ncol = 2, align = "v")
 dev.off()
 ```
 
 
-Step 4: Interpolate DO, following Jane et al. (2021)
+Step 4: Interpolate DO, following Jane et al. (2021) - note that this will take several minutes to run all lakes
 ```{r}
 #Prep for interpolation
 
@@ -393,7 +394,7 @@ to_profiles %>% filter(!is.na(DO_mgL)) %>% group_by(LakeID) %>% dplyr::select(Da
 database.interp %>% filter(!is.na(DO_mgL)) %>% group_by(LakeID) %>% dplyr::select(Date)%>% unique() #82638
 #temp
 to_profiles %>% filter(!is.na(Temp_C)) %>% group_by(LakeID) %>% dplyr::select(Date)%>% unique() #105481
-database.interp %>% filter(!is.na(Temp_C)) %>% group_by(LakeID) %>% dplyr::select(Date)%>% unique() #18363
+database.interp %>% filter(!is.na(Temp_C)) %>% group_by(LakeID) %>% dplyr::select(Date)%>% unique() #83503
 
 #look at time
 ggplot(database.interp %>% group_by(LakeID,Date)%>%dplyr::summarize(meando=mean(DO_mgL))) +

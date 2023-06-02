@@ -5,7 +5,7 @@ date: "2022-10-10"
 output: html_document
 ---
 
-This script loads climate data from the ERA5 re-analysis data product and matches climate data to LakeIDs by lat/lon. The raw ERA 5 data product is too large to store on github, so will need to be re-downloaded. If you would rather skip this step, the output of this code file (temperature and precipitation records at each lake) has been created and stored on github in "./External data/historical_precip_output_era5.csv"
+This script loads climate data from the ERA5 re-analysis data product and matches climate data to LakeIDs by lat/lon. The raw ERA 5 data product is too large to store on github, so will need to be re-downloaded. If you would rather skip this step, the output of this code file (temperature and precipitation records at each lake) has been created and stored on github in "./External data/historical_temp_output_era5.csv" and "./External data/historical_precip_output_era5.csv"
 
 Link to download ERA 5 temperature and precipitation data: https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-era5-single-levels-monthly-means?tab=form
 
@@ -46,7 +46,9 @@ Lon = ifelse(Lon > 180, -(360 - Lon), Lon)
 Lat <- ncvar_get(ncFile_t,"latitude")
 time <- ncvar_get(ncFile_t,"time")
 t_mean <- ncvar_get(ncFile_t,"t2m")
-fillvalue <- ncatt_get(ncFile_t, "t2m","missing_value")
+fillvalue <- ncatt_get(ncFile_t, "t2m","missing_value") 
+#If you get a vector memory error you may have to follow the steps here
+#https://stackoverflow.com/questions/51295402/r-on-macos-error-vector-memory-exhausted-limit-reached
 t_mean[t_mean == fillvalue$value] <- NA
 months = month(as.Date("1900-01-01")+hours(time))
 years = year(as.Date("1900-01-01")+hours(time))

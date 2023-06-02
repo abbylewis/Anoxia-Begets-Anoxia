@@ -119,10 +119,10 @@ potential_drivers = c("Chla_ugL_EPI",
                       "strat_buoyancy_freq_EPI" #all layers are the same
                       )
 aic_calculator_lmer(data_log_chla,responses,potential_drivers, interaction = "+")
-selected_drivers = c("chla_lag","strat_Temp_C_HYPO","SA_vol_ratio_HYPO","strat_buoyancy_freq_EPI")
+selected_drivers = c("Chla_ugL_EPI","chla_lag","strat_Temp_C_HYPO","SA_vol_ratio_HYPO")
 std_data = standardize_data(data_log_chla,responses,selected_drivers)
 all_lakes_vhod = mod_by_lake(data_log_chla,responses,selected_drivers, interaction = "+")
-mod_lmer = lmer(DO_demand_mgLd_HYPO~chla_lag+strat_Temp_C_HYPO+SA_vol_ratio_HYPO+strat_buoyancy_freq_EPI+(1|LakeID), data = std_data)
+mod_lmer = lmer(DO_demand_mgLd_HYPO~Chla_ugL_EPI+chla_lag+strat_Temp_C_HYPO+SA_vol_ratio_HYPO+(1|LakeID), data = std_data)
 vif(mod_lmer)
 vhod = plot_effects_lmer(mod_lmer,"VHOD (mg/L/d)", poster = POSTER)
 vhod_ridge = plot_effects_by_lake_lmer_ridge(all_lakes_vhod,var_name = "Oxygen demand (mg/L/d)",mod_lmer, poster = POSTER)
@@ -202,10 +202,10 @@ potential_drivers = c("Chla_ugL_EPI",
                       "strat_buoyancy_freq_EPI"
                       )
 aic_calculator_lmer(data_log_chla,responses,potential_drivers, interaction = "+")
-selected_drivers = c("chla_lag")
+selected_drivers = c("Chla_ugL_EPI","chla_lag","strat_buoyancy_freq_EPI")
 std_data = standardize_data(data_log_chla,responses,selected_drivers)
 all_lakes_vhod5 = mod_by_lake(data_log_chla,responses,selected_drivers, interaction = "+")
-mod_lmer = lmer(VHOD5_mgLd_HYPO~chla_lag+(1|LakeID), data = std_data) 
+mod_lmer = lmer(VHOD5_mgLd_HYPO~Chla_ugL_EPI+chla_lag+strat_buoyancy_freq_EPI+(1|LakeID), data = std_data) 
 #No need to run VIF here because there is only one driver
 confint(mod_lmer)
 summary(mod_lmer)
@@ -221,7 +221,6 @@ potential_drivers = c("TP_ugL_HYPO",
                       "spring_precip",
                       "summer_precip",
                       "winter_precip",
-                      #"summer_wind", currently the same across all dates at a lake
                       "strat_buoyancy_freq_EPI",
                       "strat_TP_date_EPI"
                       )
@@ -244,8 +243,7 @@ potential_drivers = c("DO_mgL_HYPO",
                       "spring_precip",
                       "summer_precip",
                       "winter_precip",
-                      "TP_date_HYPO"#,
-                      #"depth_ratio_HYPO"
+                      "TP_date_HYPO"
                       )
 aic_calculator_lmer(data_log_nuts,responses,potential_drivers, interaction = "+")
 selected_drivers = c("DO_mgL_HYPO","strat_TP_ugL_EPI","winter_precip")
@@ -477,7 +475,7 @@ incomplete = all_lakes_chla%>%
   full_join(all_lakes_do%>%
               dplyr::select(DO_demand_mgLd_HYPO,spring_temp,LakeID))%>%
   full_join(all_lakes_vhod%>%
-              dplyr::select(chla_lag,LakeID))
+              dplyr::select(chla_lag,Chla_ugL_EPI,LakeID))
 
 hydro = read.csv("../External data/hydrolakes_full.csv")
 lat_long = read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/fadd3eaa25b5fdd1fc4efba70e660579")
@@ -535,10 +533,22 @@ potential_drivers = c("log_MeanDepth_m",
                       "Elevation_m",
                       "log_hypoP"
                       )
-#responses = c("TP_ugL_HYPO") #Harder to disentangle the directionality of this relationship
-responses = c("hypo_p_lag")
+responses = c("TP_ugL_HYPO") #Nothing comes out cleanly
+#responses = c("hypo_p_lag") #Nothing comes out cleanly if we remove one outlier %>%filter(hypo_p_lag>-1)
 aic_calculator_onevar(for_mlr,responses,potential_drivers)
-summary(lm(TP_ugL_HYPO~log_Res_time, data = for_mlr)) #Take home: nothing comes out cleanly
+summary(lm(TP_ugL_HYPO~log_Res_time, data = for_mlr)) 
+
+#Hypo P lag shows expected pattern with res time but driven by 1 point
+for_mlr%>%
+  filter(!is.na(hypo_p_lag))%>%
+  ggplot(aes(x=Res_time,y=hypo_p_lag))+
+  geom_point()+
+  scale_x_log10()+
+  geom_hline(yintercept = 0)+
+  geom_smooth(method = "lm", color = "black")+
+  theme_bw()+
+  ylab("Coefficient for the\neffect of hypo. TP (t-1) on epi TP")+
+  xlab("Residence time (d)")
 
 potential_drivers = c("log_MeanDepth_m",
                       "log_MaximumDepth_m",
@@ -550,14 +560,12 @@ potential_drivers = c("log_MeanDepth_m",
                       )
 responses = c("strat_TP_ugL_EPI")
 aic_calculator_onevar(for_mlr,responses,potential_drivers)
-summary(lm(strat_TP_ugL_EPI~tn_tp_ratio, data = for_mlr)) #Take home: epi P has a positive relationship
+summary(lm(strat_TP_ugL_EPI~log_epiP, data = for_mlr)) #Take home: epi P has a positive relationship
 
 jpeg("../Figures/Effect of TP on chl-a.jpg", width = 4, height = 4, res = 300, units = "in")
 chla = for_mlr%>%
   filter(!is.na(strat_TP_ugL_EPI))%>%
-  #mutate(ratio = ifelse(tn_tp_ratio>44,"P limited",
-  #                      ifelse(tn_tp_ratio<12,"N limited","co-limited")))%>%
-  ggplot(aes(x=mean_epi_p,y=strat_TP_ugL_EPI))+ #, color = ratio
+  ggplot(aes(x=mean_epi_p,y=strat_TP_ugL_EPI))+
   geom_point()+
   scale_x_log10()+
   geom_hline(yintercept = 0)+
@@ -599,18 +607,6 @@ for_mlr%>%
   xlab("Mean epi. TP (µg/L)")+
   ylab("SD epi. TP (µg/L)")
 dev.off()
-
-for_mlr%>%
-  filter(!is.na(mean_epi_p),
-         !is.na(cv_epi_p))%>%
-  ggplot(aes(x=mean_epi_p,y=cv_epi_p))+
-  geom_point()+
-  scale_x_log10()+
-  geom_smooth(method = "lm",color = "black")+
-  theme_bw()+
-  ylab("SD")+
-  xlab("Mean epi. TP (µg/L)")+
-  ylab("CV epi. TP (µg/L)")
 
 potential_drivers = c("log_MeanDepth_m",
                       "log_MaximumDepth_m",
@@ -676,17 +672,28 @@ potential_drivers = c("log_MeanDepth_m",
                       "Elevation_m",
                       "mean_chla")
 responses = c("chla_lag")
+#responses = c("Chla_ugL_EPI")#Nothing comes out cleanly
 aic_calculator_onevar(for_mlr,responses,potential_drivers)
-summary(lm(chla_lag~log_MeanDepth_m, data = for_mlr)) #Take home: no significant differences
-for_mlr%>%
-  ggplot(aes(x = MeanDepth_m,y=chla_lag))+
+summary(lm(chla_lag~log_Res_time, data = for_mlr))
+vhod = for_mlr%>%
+  filter(!is.na(chla_lag))%>%
+  ggplot(aes(x = Res_time,y=chla_lag))+
   scale_x_log10()+
+  theme_bw()+
+  geom_hline(yintercept = 0)+
+  ylab("Coefficient for the\neffect of chl-a (t-1) on VHOD")+
+  xlab("Residence time (d)")+
+  geom_smooth(method = "lm",color = "black")+
   geom_point()
 
 jpeg("../Figures/Driver analysis.jpg", width = 7, height = 5, res = 300, units = "in")
 ggarrange(ggarrange(chla+stat_poly_eq(label.x = .1, label.y = 0.99),
-                    demand+stat_poly_eq(label.x = .8, data = .%>%filter(MaximumDepth_m<50)), labels = c("A","B"), widths = c(1,1.3)),
-          do+stat_compare_means(label.y.npc = 0.91),labels = c(NA,"C"), nrow = 2)
+                    demand+stat_poly_eq(label.x = .8, data = .%>%filter(MaximumDepth_m<50)), 
+                    labels = c("A","B"), widths = c(1,1.3)),
+          ggarrange(vhod+stat_poly_eq(label.x = .1, label.y = 0.91),
+                    do+stat_compare_means(label.y.npc = 0.91),
+                    labels = c("C","D"), widths = c(1,1.3)), 
+          nrow = 2)
 dev.off()
 ```
 
