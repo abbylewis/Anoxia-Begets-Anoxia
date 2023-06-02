@@ -24,14 +24,14 @@ library(openair)
 full_with_thermo = read.csv("../Compiled data/Stratified_period_data_with_thermo.csv")%>%
   mutate(Date=as.Date(Date))
 #Load lake metadata
-lat_long = read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/4/fadd3eaa25b5fdd1fc4efba70e660579")
+lat_long = read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/fadd3eaa25b5fdd1fc4efba70e660579")
 ```
 
 Step 2: Calculate the rate of change in volume-weighted oxygen concentrations during the stratified period at each lake (VHOD)
 ```{r}
 #prepare bathymetry
 #lake with only one method (data/model)
-lake_bats <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/4/6af06151bb8785235ec1b55ded19e42c")%>%
+lake_bats <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/6af06151bb8785235ec1b55ded19e42c")%>%
   filter(Area_m2>0)%>%
   group_by(LakeID)%>%
   mutate(methods_n = length(unique(Method)))%>%

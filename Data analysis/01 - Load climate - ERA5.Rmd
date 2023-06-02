@@ -5,7 +5,7 @@ date: "2022-10-10"
 output: html_document
 ---
 
-This script loads climate data from the ERA5 re-analysis data product and matches climate data to LakeIDs by lat/lon
+This script loads climate data from the ERA5 re-analysis data product and matches climate data to LakeIDs by lat/lon. The raw ERA 5 data product is too large to store on github, so will need to be re-downloaded. If you would rather skip this step, the output of this code file (temperature and precipitation records at each lake) has been created and stored on github in "./External data/historical_precip_output_era5.csv"
 
 Link to download ERA 5 temperature and precipitation data: https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-era5-single-levels-monthly-means?tab=form
 
@@ -29,7 +29,7 @@ library(lubridate)
 Step 2: Load and synthesize data
 ```{r}
 #Read and format our lake metadata
-lakes <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/4/fadd3eaa25b5fdd1fc4efba70e660579") 
+lakes <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/fadd3eaa25b5fdd1fc4efba70e660579") 
 lakes_format <- lakes %>%
   dplyr::select(LakeID,Longitude_DD,Latitude_DD) %>%
   rename(Lon=Longitude_DD,Lat=Latitude_DD)%>%
@@ -39,6 +39,7 @@ lakes_format <- lakes %>%
 
 #Read NC temp
 mynetcdf_t <- '../External data/era5.nc' #Downloaded from here: https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-era5-single-levels-monthly-means?tab=form
+#The downloaded data is too large to store on github
 ncFile_t <- nc_open(mynetcdf_t)
 Lon <- ncvar_get(ncFile_t,"longitude")
 Lon = ifelse(Lon > 180, -(360 - Lon), Lon)

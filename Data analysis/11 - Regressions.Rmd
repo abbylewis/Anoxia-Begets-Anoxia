@@ -480,7 +480,7 @@ incomplete = all_lakes_chla%>%
               dplyr::select(chla_lag,LakeID))
 
 hydro = read.csv("../External data/hydrolakes_full.csv")
-lat_long = read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/4/fadd3eaa25b5fdd1fc4efba70e660579")
+lat_long = read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/fadd3eaa25b5fdd1fc4efba70e660579")
 
 means = with_temp%>%
   group_by(LakeID)%>%

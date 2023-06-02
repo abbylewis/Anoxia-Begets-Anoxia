@@ -25,8 +25,8 @@ library(openair)
 source("thermo.depth.density.R")
 
 ## Load productivity data and metadata from EDI
-p = read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/4/0ece9d7b67cd49741ed7ee60192832e4")
-lat_long = read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/4/fadd3eaa25b5fdd1fc4efba70e660579")
+p = read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/0ece9d7b67cd49741ed7ee60192832e4")
+lat_long = read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/fadd3eaa25b5fdd1fc4efba70e660579")
 #Load interpolated DO data file, created by "02 - Temp and DO interpolation.Rmd"
 do = read.csv("../Compiled data/temp_o2_interpolated.csv")
 ```
@@ -177,7 +177,7 @@ write.csv(summer_avgs, "../Compiled data/summer_averages_wi.csv", row.names = F)
 Step 6: Calculate the percentage of the water column that is anoxic each year
 ```{r}
 ## Load bathymetry data
-lake_bats.raw <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/4/6af06151bb8785235ec1b55ded19e42c")%>%
+lake_bats.raw <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/6af06151bb8785235ec1b55ded19e42c")%>%
   filter(Area_m2>0)
 useprofiles <- summer_layers
 
