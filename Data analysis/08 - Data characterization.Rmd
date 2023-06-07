@@ -132,4 +132,7 @@ strat%>%
 strat%>%
   filter(grepl("aba",LakeID))
 sum(lat_long$MaximumDepth_m<6.4,na.rm=T)
+
+#What percentage are temperate lakes located in the U.S.
+sum(strat$Country=="USA"&strat$Latitude_DD>40&strat$Latitude_DD<60)/nrow(strat)
 ```
