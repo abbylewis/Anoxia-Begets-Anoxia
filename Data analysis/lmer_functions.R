@@ -1,7 +1,34 @@
-zscore = function(data, na.rm = T){(data-mean(data, na.rm = na.rm))/sd(data, na.rm = na.rm)}
+#'This code file contains several functions needed for the regression analyses in "11 - Regressions.Rmd"
+#'
+#'Function list
+#'
+#'Utilities: 
+#'  na_to_zero()
+#'  zscore()
+#'  standardize_data()
+#'Renamers (functions to rename variables in paper and poster figures): 
+#'  renamer()
+#'  renamer_poster()
+#'AIC model selection: 
+#'  aic_calculator_lmer()
+#'  aic_calculator_onevar()
+#'Within-lakes analysis
+#'  mod_by_lake()
+#'Plotting
+#'  plot_effects_lmer()
+#'  plot_effects_by_lake_lmer_ridge()
 
-aic_calculator_lmer = function(dataset,responses,potential_drivers,interaction="+"){
-  drivers = c(paste(potential_drivers, collapse = " "))
+
+###
+#Utilities
+###
+
+#Calculate the zscore of data in a vector
+zscore = function(data, na.rm = T){(data-mean(data, na.rm = na.rm))/sd(data, na.rm = na.rm)}
+#Sets NAs to 0
+na_to_zero = function(vector){ifelse(is.na(vector),0,vector)}
+#Standardize data
+standardize_data = function(dataset,responses,potential_drivers){
   dataset = dataset%>%
     ungroup()%>%
     dplyr::select(all_of(c(potential_drivers,responses,"LakeID")))%>%
@@ -9,162 +36,14 @@ aic_calculator_lmer = function(dataset,responses,potential_drivers,interaction="
     #group_by(LakeID)%>%
     #mutate(across(everything(),zscore))%>%
     mutate(across(-LakeID,zscore))
-  
-  for(response in responses){
-    if(sum(complete.cases(dataset))>0){
-      model = lmer(as.formula(paste0(response, "~", paste0(paste0(potential_drivers, collapse = interaction),"+(1|LakeID)"))), data = dataset)
-      AICcs = c(AICc(model))
-    } else{
-      AICcs = c(NA)
-    }
-    for (num_drivers in 1:(length(potential_drivers)-1)){
-      driver_matrix = combn(potential_drivers,num_drivers)
-      for(option_num in 1:ncol(driver_matrix)){
-        if(sum(complete.cases(dataset[c(response,driver_matrix[,option_num])]))>0){
-          model = lmer(as.formula(paste0(response, "~", paste0(paste0(driver_matrix[,option_num], collapse = interaction), "+(1|LakeID)"))), data = dataset)
-          AICcs = c(AICcs, AICc(model))
-        } else{
-          AICcs = c(AICcs, NA)
-        }
-        drivers = c(drivers, paste(driver_matrix[,option_num], collapse = " "))
-      }
-    }
-    if(response == responses[1]){
-      output = data.frame(drivers,AICcs)
-      colnames(output)=c("drivers",response)
-    } else{
-      output[response] = AICcs
-    }
-  }
-  output = output%>%
-    filter(!is.na(get(responses)))
-  
-  for(response in responses){
-    best_val = min(output[response][!is.na(output[response])&output[response]>-Inf])
-    print(paste0(response, ":"))
-    print(paste0(output$drivers[output[response]<=best_val+2],": AIC = ",round(output[response][output[response]<=best_val+2])))
-  }
-}
-
-aic_calculator_onelake = function(dataset,responses,potential_drivers,interaction="*"){
-  drivers = c(paste(potential_drivers, collapse = " "))
-  dataset = dataset%>%
-    ungroup()%>%
-    dplyr::select(all_of(c(potential_drivers,responses)))%>%
-    filter(if_all(where(is.numeric),is.finite))%>%
-    mutate(across(everything(),zscore))
-  
-  for(response in responses){
-    if(sum(complete.cases(dataset))>0){
-      model = lm(as.formula(paste0(response, "~", paste0(potential_drivers, collapse = interaction))), data = dataset)
-      AICcs = c(AICc(model))
-    } else{
-      AICcs = c(NA)
-    }
-    for (num_drivers in 1:(length(potential_drivers)-1)){
-      driver_matrix = combn(potential_drivers,num_drivers)
-      for(option_num in 1:ncol(driver_matrix)){
-        if(sum(complete.cases(dataset[c(response,driver_matrix[,option_num])]))>0){
-          model = lm(as.formula(paste0(response, "~", paste0(driver_matrix[,option_num], collapse = interaction))), data = dataset)
-          AICcs = c(AICcs, AICc(model))
-        } else{
-          AICcs = c(AICcs, NA)
-        }
-        drivers = c(drivers, paste(driver_matrix[,option_num], collapse = " "))
-      }
-    }
-    if(response == responses[1]){
-      output = data.frame(drivers,AICcs)
-      colnames(output)=c("drivers",response)
-    } else{
-      output[response] = AICcs
-    }
-  }
-  output = output%>%
-    filter(!is.na(get(responses)))
-  
-  for(response in responses){
-    best_val = min(output[response][!is.na(output[response])&output[response]>-Inf])
-    print(paste0(output$drivers[output[response]==best_val]))
-  }
   return(dataset)
 }
 
-aic_calculator = function(dataset,responses,potential_drivers,interaction="+"){
-  drivers = c(paste(potential_drivers, collapse = " "))
-  dataset = dataset%>%
-    ungroup()%>%
-    dplyr::select(all_of(c(potential_drivers,responses)))%>%
-    na.omit()%>%
-    mutate(across(everything(),zscore))
-  
-  for(response in responses){
-    if(sum(complete.cases(dataset))>0){
-      model = lm(as.formula(paste0(response, "~", paste0(potential_drivers, collapse = interaction))), data = dataset)
-      AICcs = c(AICc(model))
-    } else{
-      AICcs = c(NA)
-    }
-    for (num_drivers in 1:(length(potential_drivers)-1)){
-      driver_matrix = combn(potential_drivers,num_drivers)
-      for(option_num in 1:ncol(driver_matrix)){
-        if(sum(complete.cases(dataset[c(response,driver_matrix[,option_num])]))>0){
-          model = lm(as.formula(paste0(response, "~", paste0(driver_matrix[,option_num], collapse = interaction))), data = dataset)
-          AICcs = c(AICcs, AICc(model))
-        } else{
-          AICcs = c(AICcs, NA)
-        }
-        drivers = c(drivers, paste(driver_matrix[,option_num], collapse = " "))
-      }
-    }
-    if(response == responses[1]){
-      output = data.frame(drivers,AICcs)
-      colnames(output)=c("drivers",response)
-    } else{
-      output[response] = AICcs
-    }
-  }
-  output = output%>%
-    filter(!is.na(get(responses)))
-  
-  for(response in responses){
-    best_val = min(output[response][!is.na(output[response])&output[response]>-Inf])
-    print(paste0(response, ":"))
-    print(paste0(output$drivers[output[response]<=best_val+2],": AIC = ",round(output[response][output[response]<=best_val+2])))
-  }
-  return()
-}
+###
+#Renamers
+###
 
-aic_calculator_onevar = function(dataset,responses,potential_drivers){
-  dataset = dataset%>%
-    ungroup()%>%
-    dplyr::select(all_of(c(potential_drivers,responses)))%>%
-    na.omit()%>%
-    mutate(across(everything(),zscore))
-  
-  for(response in responses){
-    AICcs = c()
-    for(i in 1:length(potential_drivers)){
-      model = lm(as.formula(paste0(response, "~", potential_drivers[i])), data = dataset)
-      AICcs = c(AICcs, AICc(model))
-    }
-    if(response == responses[1]){
-      output = data.frame(potential_drivers,AICcs)
-      colnames(output)=c("drivers",response)
-    } else{
-      output[response] = AICcs
-    }
-  }
-  output = output%>%
-    filter(!is.na(get(responses)))
-  for(response in responses){
-    best_val = min(output[response][!is.na(output[response])&output[response]>-Inf])
-    print(paste0(response, ":"))
-    print(paste0(output$drivers[output[response]<=best_val+2],": AIC = ",round(output[response][output[response]<=best_val+2])))
-  }
-  return()
-}
-
+#Rename variables in paper figures
 renamer = function(text_vect){
   output=text_vect
   i = 1
@@ -205,6 +84,7 @@ renamer = function(text_vect){
   return(output)
 }
 
+#Rename variables in poster figures
 renamer_poster = function(text_vect){
   output=text_vect
   i = 1
@@ -240,6 +120,125 @@ renamer_poster = function(text_vect){
   return(output)
 }
 
+
+###
+# AIC model selection
+###
+
+# LMER model selection
+aic_calculator_lmer = function(dataset,responses,potential_drivers,interaction="+"){
+  drivers = c(paste(potential_drivers, collapse = " "))
+  dataset = dataset%>%
+    ungroup()%>%
+    dplyr::select(all_of(c(potential_drivers,responses,"LakeID")))%>%
+    filter(if_all(where(is.numeric),is.finite))%>%
+    mutate(across(-LakeID,zscore))
+  
+  for(response in responses){
+    if(sum(complete.cases(dataset))>0){
+      model = lmer(as.formula(paste0(response, "~", paste0(paste0(potential_drivers, collapse = interaction),"+(1|LakeID)"))), data = dataset)
+      AICcs = c(AICc(model))
+    } else{
+      AICcs = c(NA)
+    }
+    for (num_drivers in 1:(length(potential_drivers)-1)){
+      driver_matrix = combn(potential_drivers,num_drivers)
+      for(option_num in 1:ncol(driver_matrix)){
+        if(sum(complete.cases(dataset[c(response,driver_matrix[,option_num])]))>0){
+          model = lmer(as.formula(paste0(response, "~", paste0(paste0(driver_matrix[,option_num], collapse = interaction), "+(1|LakeID)"))), data = dataset)
+          AICcs = c(AICcs, AICc(model))
+        } else{
+          AICcs = c(AICcs, NA)
+        }
+        drivers = c(drivers, paste(driver_matrix[,option_num], collapse = " "))
+      }
+    }
+    if(response == responses[1]){
+      output = data.frame(drivers,AICcs)
+      colnames(output)=c("drivers",response)
+    } else{
+      output[response] = AICcs
+    }
+  }
+  output = output%>%
+    filter(!is.na(get(responses)))
+  
+  for(response in responses){
+    best_val = min(output[response][!is.na(output[response])&output[response]>-Inf])
+    print(paste0(response, ":"))
+    print(paste0(output$drivers[output[response]<=best_val+2],": AIC = ",round(output[response][output[response]<=best_val+2])))
+  }
+}
+
+#Model selection where models can only include one predictor
+aic_calculator_onevar = function(dataset,responses,potential_drivers){
+  dataset = dataset%>%
+    ungroup()%>%
+    dplyr::select(all_of(c(potential_drivers,responses)))%>%
+    na.omit()%>%
+    mutate(across(everything(),zscore))
+  
+  for(response in responses){
+    AICcs = c()
+    for(i in 1:length(potential_drivers)){
+      model = lm(as.formula(paste0(response, "~", potential_drivers[i])), data = dataset)
+      AICcs = c(AICcs, AICc(model))
+    }
+    if(response == responses[1]){
+      output = data.frame(potential_drivers,AICcs)
+      colnames(output)=c("drivers",response)
+    } else{
+      output[response] = AICcs
+    }
+  }
+  output = output%>%
+    filter(!is.na(get(responses)))
+  for(response in responses){
+    best_val = min(output[response][!is.na(output[response])&output[response]>-Inf])
+    print(paste0(response, ":"))
+    print(paste0(output$drivers[output[response]<=best_val+2],": AIC = ",round(output[response][output[response]<=best_val+2])))
+  }
+  return()
+}
+
+###
+# Within-lakes analysis
+###
+
+#Run a given model at each lake and extract coefficient estimates
+mod_by_lake = function(dataset,responses,selected_drivers,interaction = "+"){
+  lakes = dataset%>%
+    ungroup()%>%
+    dplyr::select(all_of(c(selected_drivers,responses,"LakeID","Year")))%>%
+    na.omit()%>%
+    group_by(LakeID)%>%
+    filter(length(unique(Year))>=10)
+  lakes_using = unique(lakes$LakeID)
+  output = data.frame(matrix(nrow = 0,ncol = 3+length(selected_drivers)))
+  colnames(output) = c("Intercept",selected_drivers,"R2","n")
+  for(lake in lakes_using){
+    data = lakes%>%
+      filter(LakeID == lake)%>%
+      ungroup()%>%
+      dplyr::select(all_of(c(selected_drivers,responses)))%>%
+      na.omit()%>%
+      mutate(across(everything(),zscore),
+             across(everything(),na_to_zero))
+    mod = lm(as.formula(paste0(responses, "~", paste0(selected_drivers, collapse = interaction))), data = data)
+    output = output%>%full_join(data.frame(t(mod$coefficients))%>%
+                                  rename(Intercept = 'X.Intercept.')%>%
+                                  mutate(LakeID = lake,
+                                         R2 = summary(mod)$r.squared,
+                                         n = nrow(data)))
+  }
+  return(output)
+}
+
+
+###
+#Plotting
+###
+
 plot_effects_lmer = function(mod, var_name, save = T, poster = F){
   effects = data.frame(summary(mod)$coefficients)%>%
     rename(std_error = Std..Error)
@@ -270,142 +269,6 @@ plot_effects_lmer = function(mod, var_name, save = T, poster = F){
   return(p)
 }
 
-plot_effects_by_lake_lmer = function(all_lakes, var_name, mod, poster = F){
-  effects = all_lakes%>%
-    pivot_longer(!c(LakeID,n,R2))%>%
-    filter(!name%in%c("Intercept"))
-  if(poster){
-    effects = effects%>%
-      mutate(Var = renamer_poster(name))
-  } else{ 
-    effects = effects%>%
-      mutate(Var = renamer(name))
-  }
-  order = effects%>%
-    group_by(Var)%>%
-    dplyr::summarize(median = abs(median(value,na.rm = T)))%>%
-    mutate(Var = factor(Var, levels = Var[order(median)]))
-  p1 = plot_effects_lmer(mod,"Across lakes", save = F)
-  p2 = effects%>%
-    mutate(Var = renamer(name),
-           Var = factor(Var, levels = levels(order$Var)))%>%
-    ggplot(aes(y = Var,x=value))+
-    geom_vline(xintercept = 0)+
-    geom_boxplot(outlier.shape = NA)+
-    geom_jitter(height = .1, aes(color = R2))+
-    ggtitle("Within lakes",
-            subtitle = paste0("n = ",length(unique(effects$LakeID))," lakes"))+
-    theme_bw()+
-    scale_color_viridis_c(name = "R2")+
-    xlab("Estimate")+
-    theme(axis.title.y = element_blank())
-  var_name_save = gsub("\\/","",var_name)
-  p_comb = ggarrange(p1,p2, common.legend = T, legend = "right")
-  p_comb = annotate_figure(p_comb, top = text_grob(var_name))
-  ggsave(paste0("../Figures/MLR-lmer/Parameter estimate-",var_name_save,"-all_lakes.jpeg"),
-         plot = p_comb,
-         width = 8, height = 4, units = "in",bg="white")
-  return(p2+ggtitle(var_name))
-}
-
-plot_effects_by_lake_lmer_status = function(all_lakes, var_name, mod, dataset){
-  status = dataset%>%
-    group_by(LakeID)%>%
-    filter(!is.na(DO_mgL_HYPO))%>%
-    dplyr::summarize(status = ifelse(unique(anoxic)==T, "Anoxic\n(max. DO < 1)",
-                                     ifelse(min(DO_mgL_HYPO, na.rm = T)<1,"Variable",
-                                            "Oxic\n(min. DO > 1)")))%>%
-    mutate(status = factor(status, levels = c("Anoxic\n(max. DO < 1)","Variable","Oxic\n(min. DO > 1)")))
-  effects = all_lakes%>%
-    pivot_longer(!c(LakeID,n,R2))%>%
-    filter(!name%in%c("Intercept"))
-  order = effects%>%
-    mutate(Var = renamer(name))%>%
-    group_by(Var)%>%
-    dplyr::summarize(median = abs(median(value,na.rm = T)))%>%
-    mutate(Var = factor(Var, levels = Var[order(median)]))
-  p1 = plot_effects_lmer(mod,"Across lakes", save = F)
-  p2 = effects%>%
-    mutate(Var = renamer(name),
-           Var = factor(Var, levels = levels(order$Var)))%>%
-    left_join(status)%>%
-    ggplot(aes(y = Var,x=value))+
-    geom_vline(xintercept = 0, color = "grey40")+
-    geom_boxplot(outlier.shape = NA)+
-    geom_jitter(height = .1, aes(color = status))+
-    ggtitle("Within lakes",
-            subtitle = paste0("n = ",length(unique(effects$LakeID))," lakes"))+
-    theme_bw()+
-    scale_color_manual(name = "Oxygen status", limits = c("Anoxic\n(max. DO < 1)","Variable","Oxic\n(min. DO > 1)"),values = c("#EF476F","#2F2D2E","#3E92CC"))+
-    xlab("Estimate")+
-    theme(axis.title.y = element_blank())
-  var_name_save = gsub("\\/","",var_name)
-  p_comb = ggarrange(p1,p2, common.legend = T, legend = "right")
-  p_comb = annotate_figure(p_comb, top = text_grob(var_name))
-  ggsave(paste0("../Figures/MLR-lmer/Parameter estimate-",var_name_save,"-all_lakes-status.jpeg"),
-         plot = p_comb,
-         width = 8, height = 4, units = "in",bg="white")
-  return(p2+ggtitle(var_name))
-}
-
-#Not currently using: function to do ridge plots without lmer
-plot_effects_by_lake_ridge = function(all_lakes, var_name, mod, poster = F){
-  effects = all_lakes%>%
-    pivot_longer(!c(LakeID,n,R2))%>%
-    filter(!name%in%c("Intercept"))
-  if(poster){
-    effects = effects%>%
-      mutate(Var = renamer_poster(name))
-  } else{
-    effects = effects%>%
-      mutate(Var = renamer(name))
-  }
-  order = effects%>%
-    group_by(Var)%>%
-    dplyr::summarize(median = abs(median(value,na.rm = T)))%>%
-    mutate(Var = factor(Var, levels = Var[order(median)]))
-  p1 = plot_effects_lmer(mod,"Across lakes", save = F)
-  p2 = effects%>%
-    mutate(Var = renamer(name),
-           Var = factor(Var, levels = levels(order$Var)))%>%
-    ggplot(aes(y = Var,x=value))+
-    geom_vline(xintercept = 0, color = "grey40")+
-    #scale_fill_viridis_d()+
-    #geom_boxplot(outlier.shape = NA)+
-    #geom_jitter(height = .1, aes(color = R2))+
-    geom_density_ridges(
-      quantile_lines = TRUE,
-      jittered_points = TRUE,
-      alpha = 1,
-      point_alpha = 1,
-      fill = "grey96",
-      point_color = "grey50",
-      point_fill = "white",
-      #aes(point_fill = Var),
-      point_shape = 21,
-      scale=0.9)+
-    stat_density_ridges(
-      quantile_lines = TRUE,
-      geom = "density_ridges_gradient", calc_ecdf = TRUE,aes(fill = factor(after_stat(quantile))),
-      scale=0.9)+
-    ggtitle("Within lakes",
-            subtitle = paste0("n = ",length(unique(effects$LakeID))," lakes"))+
-    theme_bw()+
-    scale_fill_viridis_d(alpha=0.1)+
-    scale_color_viridis_c()+
-    xlab("Estimate")+
-    theme(axis.title.y = element_blank(),
-          legend.position = "none",
-          axis.text.y = element_text(vjust = 0))
-  var_name_save = gsub("\\/","",var_name)
-  p_comb = ggarrange(p1,p2)
-  p_comb = annotate_figure(p_comb, top = text_grob(var_name))
-  ggsave(paste0("../Figures/MLR-lmer/Parameter estimate-",var_name_save,"-all_lakes-ridge.jpeg"),
-         plot = p_comb,
-         width = 8, height = 4, units = "in",bg="white")
-  return(p2+ggtitle(var_name))
-}
-
 plot_effects_by_lake_lmer_ridge = function(all_lakes, var_name, mod, poster = F){
   effects = all_lakes%>%
     pivot_longer(!c(LakeID,n,R2))%>%
@@ -433,9 +296,6 @@ plot_effects_by_lake_lmer_ridge = function(all_lakes, var_name, mod, poster = F)
     ggplot(aes(y = Var))+
     geom_vline(xintercept = 0, color = "grey40", linewidth=2)+
     xlim(-1,1)+
-    #scale_fill_viridis_d()+
-    #geom_boxplot(outlier.shape = NA)+
-    #geom_jitter(height = .1, aes(color = R2))+
     geom_density_ridges(
       aes(x=value),
       quantile_lines = TRUE,
@@ -471,48 +331,4 @@ plot_effects_by_lake_lmer_ridge = function(all_lakes, var_name, mod, poster = F)
          plot = p2,
          width = 4, height = 4, units = "in",bg="white")
   return(p2+ggtitle(var_name))
-}
-
-na_to_zero = function(vector){
-  ifelse(is.na(vector),0,vector)
-}
-
-mod_by_lake = function(dataset,responses,selected_drivers,interaction = "+"){
-  lakes = dataset%>%
-    ungroup()%>%
-    dplyr::select(all_of(c(selected_drivers,responses,"LakeID","Year")))%>%
-    na.omit()%>%
-    group_by(LakeID)%>%
-    filter(length(unique(Year))>=10)
-  lakes_using = unique(lakes$LakeID)
-  output = data.frame(matrix(nrow = 0,ncol = 3+length(selected_drivers)))
-  colnames(output) = c("Intercept",selected_drivers,"R2","n")
-  for(lake in lakes_using){
-    data = lakes%>%
-      filter(LakeID == lake)%>%
-      ungroup()%>%
-      dplyr::select(all_of(c(selected_drivers,responses)))%>%
-      na.omit()%>%
-      mutate(across(everything(),zscore),
-             across(everything(),na_to_zero))
-    mod = lm(as.formula(paste0(responses, "~", paste0(selected_drivers, collapse = interaction))), data = data)
-    output = output%>%full_join(data.frame(t(mod$coefficients))%>%
-                                  rename(Intercept = 'X.Intercept.')%>%
-                                  mutate(LakeID = lake,
-                                         R2 = summary(mod)$r.squared,
-                                         n = nrow(data)))
-  }
-  return(output)
-}
-
-
-standardize_data = function(dataset,responses,potential_drivers){
-  dataset = dataset%>%
-    ungroup()%>%
-    dplyr::select(all_of(c(potential_drivers,responses,"LakeID")))%>%
-    filter(if_all(where(is.numeric),is.finite))%>%
-    #group_by(LakeID)%>%
-    #mutate(across(everything(),zscore))%>%
-    mutate(across(-LakeID,zscore))
-  return(dataset)
 }

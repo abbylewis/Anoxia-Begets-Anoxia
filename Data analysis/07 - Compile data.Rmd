@@ -7,9 +7,11 @@ output: html_document
 
 This document synthesizes all of the calculated data saved up to this point and outputs a file for later analyses. 
 
+Table of contents:
 Step 1: Load packages
 Step 2: Compile all in-lake data
 Step 3: Add climate data
+
 
 Step 1: Load packages
 ```{r setup, include=FALSE}

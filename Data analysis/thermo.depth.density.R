@@ -1,3 +1,8 @@
+#I modified this code file from RLakeAnalyzer to use density, 
+#rather than temperature differences to estimate the thermocline boundaries
+
+
+
 #' @title Calculate depth of the thermocline from a temperature profile.
 #' 
 #' @description This function calculates the location of the thermocline from a temperature

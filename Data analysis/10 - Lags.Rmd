@@ -7,6 +7,7 @@ output: html_document
 
 This file analyzes relevant lags for ABA relationships of interest. 
 
+Table of contents:
 Step 1: Load packages and data
 Step 2: Hypo. DO vs. TP lag
 Step 3: Hypo. TP vs epi. TP lag
@@ -20,6 +21,8 @@ Step 1: Load packages and data
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(lubridate)
+
+set.seed(47) #Set seed so points jitter the same every time
 
 #Load saved data
 with_temp = read.csv("../Compiled data/All_data_annual.csv")

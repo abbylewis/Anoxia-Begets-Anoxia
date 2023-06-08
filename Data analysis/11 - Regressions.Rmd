@@ -7,12 +7,14 @@ output: html_document
 
 This file runs the model selection algorithm and regressions both within and across lakes
 
+Table of contents:
 Step 1: Load packages and data
 Step 2: Format data for regressions
 Step 3: Model selection
 Step 4: Generate combined figures
 Step 5: Driver analysis
 Step 6: DO/TP figure
+
 
 Step 1: Load packages and data
 ```{r setup, include=FALSE}
@@ -32,7 +34,9 @@ library(tidyverse)
 library(lubridate)
 source("lmer_functions.R")
 
-POSTER=F #Should figures be designed for a poster? Or for the manuscript
+POSTER=F #Set global option: Should figures be designed for a poster? Or for the manuscript
+
+set.seed(47) #Set seed so points jitter the same way each time
 
 #Load saved data
 with_temp = read.csv("../Compiled data/All_data_annual.csv")
@@ -210,7 +214,6 @@ mod_lmer = lmer(VHOD5_mgLd_HYPO~Chla_ugL_EPI+chla_lag+strat_buoyancy_freq_EPI+(1
 confint(mod_lmer)
 summary(mod_lmer)
 plot_effects_lmer(mod_lmer,"Temperature-corrected oxygen demand") 
-plot_effects_by_lake_lmer(all_lakes_vhod5,"Temperature-corrected oxygen demand",mod_lmer)
 plot_effects_by_lake_lmer_ridge(all_lakes_vhod5,"Temperature-corrected oxygen demand",mod_lmer)
 
 ###

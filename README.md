@@ -39,7 +39,7 @@ All data analysis scripts:
     * Combine late-summer and stratified means with oxygen demand, and climate data. Output a file for following analyses.
 * 08 - Data characterization.Rmd
     * Characterize the full, synthesized dataset. Output summary figures
-* 09 - Air temp analysis (AIM 2).Rmd
+* 09 - Air temp analysis.Rmd
     * Analyze the effects of changing monthly air temperatures on hypolimnetic temperature and oxygen dynamics
 * 10 - Lags.Rmd
     * Analyze the relevant lags for each relationship in the anoxia-begets-anoxia (ABA) feedback

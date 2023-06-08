@@ -5,8 +5,13 @@ date: "2023-03-23"
 output: html_document
 ---
 
-This file compiles hydrolakes metadata using unique hydrolakes IDs
+This file compiles hydrolakes metadata using unique hydrolakes IDs. The raw hydrolakes shapefile is too large to store on github, so will need to be re-downloaded. If you would rather skip this step, the output of this code file (hydrolakes metadata for each lake) has been created and stored on github in "./External data/hydrolakes_full.csv"
 
+To download raw hydrolakes data: 
+https://www.hydrosheds.org/products/hydrolakes
+  Lake pour points (including all attributes) in shapefileformat (79MB).
+
+Table of contents:
 Step 1: Load packages
 Step 2: Add hydrolakes data
 

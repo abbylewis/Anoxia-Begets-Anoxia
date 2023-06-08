@@ -7,10 +7,12 @@ output: html_document
 
 This file calculates volume-weighted hypolimnetic oxygen demand during the stratified period at each lake. 
 
+Table of contents:
 Step 1: Load data and packages
 Step 2: Calculate the rate of change in volume-weighted oxygen concentrations during the stratified period at each lake (VHOD)
 Step 3: Calculate temperature-corrected oxygen demand values
 Step 4: Calculate trends in oxygen demand over time
+
 
 Step 1: Load data and packages
 ```{r setup, include=FALSE}
@@ -26,6 +28,7 @@ full_with_thermo = read.csv("../Compiled data/Stratified_period_data_with_thermo
 #Load lake metadata
 lat_long = read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/fadd3eaa25b5fdd1fc4efba70e660579")
 ```
+
 
 Step 2: Calculate the rate of change in volume-weighted oxygen concentrations during the stratified period at each lake (VHOD)
 ```{r}
@@ -139,10 +142,14 @@ write.csv(vhod5, "../Compiled data/VHOD5 points.csv", row.names = F)
 ```
 
 
-Step 4: Calculate trends in oxygen demand over time
+Step 4: Calculate trends in oxygen demand over time. This is not currently part of the manuscript, but I thought the analysis was interesting
 ```{r}
+#At one point, I was interested in whether trends are different before and after a given year, 
+#so the function below is set up to accommodate calculating trends on either side of a given year
+#not currently using, and may not work well at this point
 split_year = 1800
 
+#Function
 sen_slope_custom <- function(df,var){
   output = df%>%
     mutate(era = ifelse(Year<split_year,"before","after"))%>%
@@ -181,10 +188,11 @@ sen_slope_custom <- function(df,var){
   return(output)
 }
 
+#Calculate trends
 vw_demand_sen = sen_slope_custom(vw_do_demand_qaqc,"DO_demand_mgLd")
-
 vhod5_sen = sen_slope_custom(vhod5,"VHOD5_mgLd")
 
+#Plot
 vw_demand_sen%>%
   filter(!is.na(trend),
          sig<0.05)%>%

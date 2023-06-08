@@ -7,6 +7,7 @@ output: html_document
 
 This file loads temp/DO/productivity data and calculates mean concentrations of each focal variable during the late-summer period (July 15-Aug 31 in the Northern Hemisphere). Functionally, all of the code here will be very similar to "03 - Stratified avgs.Rmd", except that that file is for the whole stratified period and this file is ONLY for the late-summer period. All code chunks must be run in order.
 
+Table of contents:
 Step 1: Load data and packages
 Step 2: QAQC
 Step 3: Filter to stratified period and calculate thermocline depths

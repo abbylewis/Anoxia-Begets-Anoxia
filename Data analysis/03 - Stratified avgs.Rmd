@@ -7,6 +7,7 @@ output: html_document
 
 This file loads temp/DO/productivity data and calculates mean concentrations of each focal variable during the summer stratified period. All code chunks must be run in order.
 
+Table of contents:
 Step 1: Load data and packages
 Step 2: Summary statistics
 Step 3: Filter to stratified period

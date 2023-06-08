@@ -8,8 +8,15 @@ output: html_document
 This code file interpolates DO and temperature data to a 1m depth resolution, following Jane et al. (2021)
 
 Methods to replicate: 
-
 Impossible values were first removed, which were defined as those less than 0 or greater than 40 for both temperature (degreesCelsius) and DO (milligramsPerLiter). Profiles were removed from further processing if this either removed greater than 95% of a profile or left less than three measurement depths in a profile. Some profiles lacked a 0 depth point. Prior to interpolation, this was added by 1) changing the minimum depth to 0 if it was less than 0.5 m, 2) adding a 0 depth point and assigning temperature and DO values equal to the shallowest available depth if it was greater than 0.5 m but less than or equal to 3 m deep, 3) if the minimum depth exceeded 3 m the profile was excluded from interpolation. Profiles were interpolated from 0 m to the deepest point at 0.5 m intervals using the pchip function of the pracma R package. 
+
+Table of contents for this markdown file:
+Step 1: Load packages
+Step 2: QAQC
+Step 3: Plot the results of QAQC (this is presented as a figure in Appendix S3)
+Step 4: Interpolate DO, following Jane et al. (2021) - note that this will take up to 30 min to run all lakes
+Step 5: Interpolate temp - note that this will take up to 30 min to run all lakes
+Step 6: combine DO and temp
 
 
 Step 1: Load packages
@@ -200,7 +207,7 @@ dev.off()
 ```
 
 
-Step 4: Interpolate DO, following Jane et al. (2021) - note that this will take several minutes to run all lakes
+Step 4: Interpolate DO, following Jane et al. (2021) - note that this will take up to 30 min to run all lakes
 ```{r}
 #Prep for interpolation
 
@@ -293,7 +300,7 @@ ploto<-ggplot(interpolatedvalues.do)+
 ```
 
 
-Step 5: Interpolate temp (slow)
+Step 5: Interpolate temp - note that this will take up to 30 min to run all lakes
 ```{r}
 #Prep for interpolation
 

@@ -5,6 +5,15 @@ date: "2023-05-22"
 output: html_document
 ---
 
+This code file performs basic characterization of the dataset and generates maps of lake study sites
+
+Table of contents:
+Step 1: Load packages and compiled data
+Step 2: Summarize data duration
+Step 3: Map distribution of lakes
+Step 4: Calculate n from each source
+
+
 Step 1: Load packages and compiled data
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -17,7 +26,8 @@ with_temp = read.csv("../Compiled data/All_data_annual.csv")
 ```
 
 
-Step 2: Summarize data duration. NOTE this is for years with HYPO or EPI data of interest. Total duration stats for paper are from "03 Stratified avgs.Rmd"
+Step 2: Summarize data duration
+NOTE this is for years with HYPO or EPI data of interest. Total duration stats for paper are from "03 Stratified avgs.Rmd"
 ```{r}
 min(with_temp$Year)
 max(with_temp$Year)
@@ -46,7 +56,7 @@ length(unique(with_temp$LakeID))
 ```
 
 
-Step 2: Map distribution of lakes
+Step 3: Map distribution of lakes
 ```{r}
 library(ggthemes)
 library(sf)
@@ -115,7 +125,8 @@ euro_map
 dev.off()
 ```
 
-Calculate n from each source
+
+Step 4: Calculate n from each source
 ```{r}
 lat_long = read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/fadd3eaa25b5fdd1fc4efba70e660579")
 length(unique(lat_long$LakeID))
