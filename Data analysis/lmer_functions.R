@@ -77,7 +77,7 @@ renamer = function(text_vect){
     if(text=="epi_n_lag")          output[i]="Epi. TN (t-1)"
     if(text=="DO_mgL_HYPO")        output[i]="Hypo. DO"
     if(text=="TN_ugL_EPI")         output[i]="Epi. TN"
-    if(text=="DO_date_HYPO")       output[i]="Oxyen measurement\ndate (lake-year mean)"
+    if(text=="DO_date_HYPO")       output[i]="Oxygen measurement\ndate (lake-year mean)"
     if(text=="SA_vol_ratio_HYPO")  output[i]="Hypo. surface area\nto volume ratio"
     i = i+1
   }
@@ -114,7 +114,7 @@ renamer_poster = function(text_vect){
     if(text=="epi_n_lag")          output[i]="Epi. TN (t-1)"
     if(text=="DO_mgL_HYPO")        output[i]="Bottom water oxygen"
     if(text=="TN_ugL_EPI")         output[i]="Surface nitrogen"
-    if(text=="DO_date_HYPO")       output[i]="Oxyen measurement\ndate (lake-year mean)"
+    if(text=="DO_date_HYPO")       output[i]="Oxygen measurement\ndate (lake-year mean)"
     i = i+1
   }
   return(output)
