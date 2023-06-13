@@ -176,7 +176,7 @@ sen_slope_custom <- function(df,var){
           filter(Year>split_year)%>%
           dplyr::select(-Year)
       }
-      if(length(unique(year(filt$date)))>=5){
+      if(length(unique(year(filt$date)))>=10){#Only calculate a trend if there are 10 years of data
         sen = TheilSen(filt, pollutant = var, avg.time = "year", plot = F)$data$res2
         output$trend[output$LakeID==lake&output$era == era]<-sen$slope[1]
         output$sig[output$LakeID==lake&output$era == era]<-sen$p[1]

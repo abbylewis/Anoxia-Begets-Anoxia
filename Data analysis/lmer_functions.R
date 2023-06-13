@@ -65,7 +65,7 @@ renamer = function(text_vect){
     if(text=="summer_precip")      output[i]="Summer\nprecipitation"
     if(text=="spring_precip")      output[i]="Spring\nprecipitation"
     if(text=="winter_precip")      output[i]="Winter\nprecipitation"
-    if(text=="DO_demand_mgLd_HYPO")output[i]="VHOD"
+    if(text=="DO_demand_mgLd_HYPO")output[i]="Oxygen demand"
     if(text=="TP_ugL_HYPO")        output[i]="Hypo. TP"
     if(text=="strat_TP_ugL_HYPO")  output[i]="Hypo. TP\n(stratified)"
     if(text=="hypo_p_lag")         output[i]="Hypo. TP (t-1)"

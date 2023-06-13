@@ -40,7 +40,7 @@ lat_long <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/fa
 #Remove very shallow lakes
 to_profiles = to_profiles_all%>%
   left_join(lat_long, by = c("LakeID"))%>%
-  filter(is.na(MaximumDepth_m)|MaximumDepth_m>3)%>%
+  filter(is.na(MaximumDepth_m)|MaximumDepth_m>6.4)%>%
   rename(reported_max_depth = MaximumDepth_m)
 
 #Take a look at cases where the depth sampled is deeper than the reported max depth of the lake
@@ -83,7 +83,7 @@ to_profiles_depth_checked = test_depth_removal%>%
 nrow(to_profiles)
 nrow(to_profiles_depth_checked)
 nrow(to_profiles_depth_checked)/nrow(to_profiles) #84% of the data points remain
-nrow(to_profiles%>%filter(reported_max_depth>3)) #The loss of profiles is not primarily because of shallow lakes
+nrow(to_profiles%>%filter(reported_max_depth>6.4)) #The loss of profiles is not primarily because of shallow lakes
 
 length(unique(to_profiles$LakeID))
 unique(to_profiles$LakeID[is.na(to_profiles$reported_max_depth)])
@@ -120,7 +120,7 @@ unclean = to_profiles%>%
 unclean_plot = unclean%>%
   ggplot(aes(x = reported_max_depth,y=pct_sampled))+
   geom_point(alpha = 0.3, color = "blue")+
-  geom_text(aes(x=3.05,y=190,label = paste0(
+  geom_text(aes(x=6.5,y=190,label = paste0(
     "Mean: ",round(unique(mean_pct_sampled),1),"%",
     "\nMedian: ",round(unique(median_pct_sampled),1),"%",
     "\nn: ",unique(n_lakes)," lakes"
@@ -136,7 +136,7 @@ unclean_plot = unclean%>%
 unclean_sd = unclean%>%
   ggplot(aes(x = reported_max_depth,y=sd_max))+
   geom_point(alpha = 0.3, color = "blue")+
-  geom_text(aes(x=3.05,y=45,label = paste0(
+  geom_text(aes(x=6.5,y=45,label = paste0(
     "Mean: ",round(unique(mean_sd_max),1),"m",
     "\nMedian: ",round(unique(median_sd_max),1),"m")), hjust = 0, vjust = 1)+
   #geom_hline(yintercept=100)+
@@ -171,7 +171,7 @@ clean = test_depth_removal%>%
 clean_plot = clean%>%
   ggplot(aes(x = reported_max_depth,y=pct_sampled))+
   geom_point(alpha = 0.3, color = "blue")+
-  geom_text(aes(x=3.05,y=190,label = paste0(
+  geom_text(aes(x=6.5,y=190,label = paste0(
     "Mean: ",round(unique(mean_pct_sampled),1),"%",
     "\nMedian: ",round(unique(median_pct_sampled),1),"%",
     "\nn: ",unique(n_lakes)," lakes"
@@ -189,7 +189,7 @@ clean_plot = clean%>%
 clean_sd = clean%>%
   ggplot(aes(x = reported_max_depth,y=sd_max))+
   geom_point(alpha = 0.3, color = "blue")+
-  geom_text(aes(x=3.05,y=45,label = paste0(
+  geom_text(aes(x=6.5,y=45,label = paste0(
     "Mean: ",round(unique(mean_sd_max),1),"m",
     "\nMedian: ",round(unique(median_sd_max),1),"m")), hjust = 0, vjust = 1)+
   #geom_hline(yintercept=100)+
