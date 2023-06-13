@@ -128,7 +128,7 @@ std_data = standardize_data(data_log_chla,responses,selected_drivers)
 all_lakes_vhod = mod_by_lake(data_log_chla,responses,selected_drivers, interaction = "+")
 mod_lmer = lmer(DO_demand_mgLd_HYPO~Chla_ugL_EPI+chla_lag+strat_Temp_C_HYPO+SA_vol_ratio_HYPO+(1|LakeID), data = std_data)
 vif(mod_lmer)
-vhod = plot_effects_lmer(mod_lmer,"VHOD (mg/L/d)", poster = POSTER)
+vhod = plot_effects_lmer(mod_lmer,"Oxygen demand (mg/L/d)", poster = POSTER)
 vhod_ridge = plot_effects_by_lake_lmer_ridge(all_lakes_vhod,var_name = "Oxygen demand (mg/L/d)",mod_lmer, poster = POSTER)
 
 ###
@@ -367,49 +367,59 @@ jpeg("../Figures/MLR-lmer/Parameter estimate-all-custom layout.jpeg", width = 7,
 grid.arrange(g1,g2,g3,g4,g5,layout_matrix=layout)
 dev.off()
 
-g1 <- ggplotGrob(hypo_do +
-                   ggtitle("Bottom-water oxygen")+
+#GLEON poster
+
+g1 <- ggplotGrob(hypo_p  +
+                   #ggtitle("Bottom-water phosphorus")+
                    theme(plot.title = element_text(size = 10),
                          plot.subtitle = element_text(size = 9),
-                         axis.title.x = element_blank()))
-g2 <- ggplotGrob(hypo_p  +
-                   ggtitle("Bottom-water phosphorus")+
+                         axis.title.x = element_blank())+
+                   force_panelsizes(rows = unit(3*5/6, "cm")))
+g2 <- ggplotGrob(epi_p   +
+                   #ggtitle("Surface phosphorus")+
                    theme(plot.title = element_text(size = 10),
                          plot.subtitle = element_text(size = 9),
-                         axis.title.x = element_blank()))
-g3 <- ggplotGrob(epi_p   +
-                   ggtitle("Surface phosphorus")+
-                   theme(plot.title = element_text(size = 10),
-                         plot.subtitle = element_text(size = 9)))
-g4 <- ggplotGrob(epi_chla+
-                   ggtitle("Surface phytoplankton")+
+                         axis.title.x = element_blank())+
+                   force_panelsizes(rows = unit(6*5/6, "cm")))
+g3 <- ggplotGrob(epi_chla+
+                   #ggtitle("Surface phytoplankton")+
                    theme(plot.title = element_text(size = 10),
                          plot.subtitle = element_text(size = 9),
-                         axis.title.x = element_blank()))
-g5 <- ggplotGrob(vhod    +
-                   ggtitle("Oxygen consumption")+
+                         axis.title.x = element_blank())+
+                   force_panelsizes(rows = unit(2*5/6, "cm")))
+g4 <- ggplotGrob(vhod    +
+                   #ggtitle("Oxygen consumption")+
                    theme(plot.title = element_text(size = 10),
-                         plot.subtitle = element_text(size = 9)))
+                         plot.subtitle = element_text(size = 9))+
+                   force_panelsizes(rows = unit(4*5/6, "cm")))
+g5 <- ggplotGrob(hypo_do +
+                   #ggtitle("Bottom-water oxygen")+
+                   theme(plot.title = element_text(size = 10),
+                         plot.subtitle = element_text(size = 9))+
+                   force_panelsizes(rows = unit(4*5/6, "cm")))
+
 maxWidth <- unit.pmax(g1$widths,g2$widths,g3$widths,g4$widths,g5$widths)
 g1$widths <- maxWidth
 g2$widths <- maxWidth
 g3$widths <- maxWidth
 g4$widths <- maxWidth
 g5$widths <- maxWidth
-g4.5 = rbind(g4,g5)
+
 layout <- rbind(c(1, 2),
                 c(1, 2),
                 c(1, 2),
                 c(1, 2),
                 c(3, 2),
-                c(3, 4.5),
-                c(3, 4.5),
-                c(3, 4.5),
-                c(3, 4.5),
-                c(3, 4.5))
+                c(3, 2),
+                c(3, 5),
+                c(4, 5),
+                c(4, 5),
+                c(4, 5),
+                c(4, 5),
+                c(4, NA))
 
-jpeg("../Figures/MLR-lmer/Parameter estimate-all-custom layout poster.jpeg", width = 6.6, height = 6.5, res = 600, units = "in")
-grid.arrange(g1,g2,g3,g4.5, layout_matrix=layout)
+jpeg("../Figures/MLR-lmer/Parameter estimate-all-custom layout poster.jpeg", width = 6.6, height = 5.5, res = 600, units = "in")
+grid.arrange(g1,g2,g3,g4,g5, layout_matrix=layout)
 dev.off()
 
 g1 <- ggplotGrob(hypo_p_ridge   
@@ -675,8 +685,8 @@ potential_drivers = c("log_MeanDepth_m",
                       "Elevation_m",
                       "mean_chla")
 responses = c("chla_lag")
-#responses = c("Chla_ugL_EPI")#Nothing comes out cleanly
-aic_calculator_onevar(for_mlr,responses,potential_drivers)
+responses = c("Chla_ugL_EPI")#Nothing comes out cleanly
+#aic_calculator_onevar(for_mlr,responses,potential_drivers)
 summary(lm(chla_lag~log_Res_time, data = for_mlr))
 vhod = for_mlr%>%
   filter(!is.na(chla_lag))%>%
@@ -746,5 +756,91 @@ dev.off()
 jpeg("../Figures/Depth DO and TP.jpeg", width = 6, height = 3, res = 300, units = "in")
 ggarrange(do_tp,depth_tp,align = "h")
 dev.off()
+```
+
+
+Step 7: Before and after figure
+```{r}
+total = with_temp%>%
+  filter(!is.na(DO_mgL_HYPO))%>%
+  group_by(LakeID)%>%
+  filter(length(unique(Year))>=10)%>%
+  ungroup()%>%
+  summarize(length(unique(LakeID)))
+
+anoxic = with_temp%>%
+  filter(!is.na(DO_mgL_HYPO))%>%
+  group_by(LakeID)%>%
+  filter(length(unique(Year))>=10,
+         max(DO_mgL_HYPO)<1)%>%
+  ungroup()
+length(unique(anoxic$LakeID))
+
+oxic = with_temp%>%
+  filter(!is.na(DO_mgL_HYPO))%>%
+  group_by(LakeID)%>%
+  filter(length(unique(Year))>=10,
+         min(DO_mgL_HYPO)>1)%>%
+  ungroup()
+length(unique(oxic$LakeID))
+
+switch = with_temp%>%
+  filter(!is.na(DO_mgL_HYPO))%>%
+  group_by(LakeID)%>%
+  filter(length(unique(Year))>=10,
+         min(DO_mgL_HYPO)<1,
+         max(DO_mgL_HYPO)>1
+         )%>%
+  ungroup()
+length(unique(switch$LakeID))
+
+status_data = with_temp%>%
+  group_by(LakeID)%>%
+  arrange(LakeID,Year)%>%
+  filter(!is.na(DO_mgL_HYPO))%>%
+  filter(sum(DO_mgL_HYPO<1.4)>=1,
+         )%>%
+  mutate(anoxic_date = min(Year[DO_mgL_HYPO<1.4]),
+         first_date = min(Year),
+         end_date = max(Year),
+         status = ifelse(Year>anoxic_date,"post-anoxia","pre-anoxia"),
+         status = ifelse(Year==anoxic_date,"first anoxia",status),
+         status = factor(status,levels = c("pre-anoxia","first anoxia","post-anoxia")))%>%
+  filter(abs(Year-anoxic_date)<=5)%>%
+  filter(sum(status=="pre-anoxia")>0,
+         sum(status=="post-anoxia")>0,
+         sum(status=="first anoxia")>0
+         )%>%
+  mutate(oxic = as.factor(DO_mgL_HYPO>1))
+
+jpeg("../Figures/anoxia_status_do.jpg",res=300,width=3, height=3,units="in")
+status_data%>%
+  filter(!is.na(DO_mgL_HYPO),
+         abs(Year-anoxic_date)<=1)%>%
+  group_by(LakeID)%>%
+  mutate(n = n())%>%
+  filter(n == 3)%>%
+  ggplot(aes(x=status,y=DO_mgL_HYPO))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_jitter(width=.2, alpha = 0.2)+
+  scale_color_viridis_c()+
+  theme_bw()+
+  #stat_compare_means()+
+  theme(axis.title.x = element_blank(),
+        legend.position = "none")+
+  ylab("DO (mg/L)")
+dev.off()
+
+status_data_do = status_data%>%
+  filter(!is.na(DO_mgL_HYPO),
+         abs(Year-anoxic_date)<=1)%>%
+  group_by(LakeID)%>%
+  mutate(n = n())%>%
+  filter(n == 3)
+
+length(unique(status_data_do$LakeID))
+
+friedman.test(y = status_data_do$DO_mgL_HYPO, groups = status_data_do$status, blocks = status_data_do$LakeID)
+TukeyHSD(aov(lm(DO_mgL_HYPO~status+LakeID, data=status_data_do)))
 ```
 
