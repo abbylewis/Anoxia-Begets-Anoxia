@@ -26,17 +26,17 @@ library(openair)
 source("thermo.depth.density.R")
 
 ## Load productivity data and metadata from EDI
-p = read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/0ece9d7b67cd49741ed7ee60192832e4")
-lat_long = read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/fadd3eaa25b5fdd1fc4efba70e660579")
+p <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/0ece9d7b67cd49741ed7ee60192832e4")
+lat_long <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/fadd3eaa25b5fdd1fc4efba70e660579")
 #Load interpolated DO data file, created by "02 - Temp and DO interpolation.Rmd"
-do = read.csv("../Compiled data/temp_o2_interpolated.csv")
+do <- read.csv("../Compiled data/temp_o2_interpolated.csv")
 ```
 
 
 Step 2: QAQC
 ```{r}
 #Merge P, DO, and lake info (from lat long file)
-full = p%>%
+full <- p%>%
   full_join(do, by = c("Date","LakeID","Depth_m"))%>%
   full_join(lat_long, by = c("LakeID"))%>%
   mutate(Date = as.Date(Date))%>%
@@ -44,37 +44,37 @@ full = p%>%
 
 #Create a Date_22 column, so that I can filter to only the end of summer
 full$Date_22 <- full$Date
-year(full$Date_22)<-2022
+year(full$Date_22) <-2022
 
 #There are a few rows with missing dates because these lakes are in the lat long database and not do/p
 full%>%
   filter(is.na(as.Date(Date)))
 
 #Remove these NAs for now
-full = full%>%
+full <- full%>%
   filter(!is.na(Date))
 
 #Missing depths
-p = full%>%
+missing_depths <- full%>%
   filter(is.na(Depth_m)) #Fair # of missing depths, mostly from the Jane et al. data publication
-unique(p$LakeID)
+unique(missing_depths$LakeID)
 
-q = full%>%
+missing_depth_and_interval <- full%>%
   filter(is.na(Depth_m)&is.na(Interval)) #Most of the missing depths that are NOT from the Jane et al. data publication have the interval filled in
-unique(q$LakeID)
+unique(missing_depth_and_interval$LakeID)
 ```
 
 
 Step 3: Filter to stratified period and calculate thermocline depths
 ```{r}
-full_trimmed = full%>%
+full_trimmed <- full%>%
   filter(((Latitude_DD>0)&Date_22>=as.Date("2022-07-15")&Date_22<=as.Date("2022-08-31"))|
            ((Latitude_DD<0)&Date_22>=as.Date("2022-01-15")&Date_22<=as.Date("2022-02-28")))%>%
   dplyr::select(-Date_22)%>%
   mutate(start_date = ifelse(Latitude_DD>0,"2022-07-15","2022-01-15"))
 
 #Calculate thermocline depths
-thermo_depths = full_trimmed%>%
+thermo_depths <- full_trimmed%>%
   group_by(Date, LakeID, Depth_m)%>%
   dplyr::summarize(Temp_C = mean(Temp_C, na.rm = T))%>%
   filter(!is.na(Temp_C))%>%
@@ -92,7 +92,7 @@ thermo_depths = full_trimmed%>%
             count_unstrat = sum(unstrat),
             n = n())
 
-#How many are removed by filtering out lakes with 10% of profiles being unstratified?
+#How many are removed by filtering out lakes with 10% of profiles being unstratified? 25
 thermo_depths%>%
   group_by(LakeID)%>%
   dplyr::mutate(count_unstrat_tot = sum(count_unstrat),
@@ -102,7 +102,7 @@ thermo_depths%>%
   summarize(lakes = length(unique(LakeID)))
 
 #Remove years with unstratified profiles and lakes where 10% of years have unstratified profiles
-thermo_depths_sum = thermo_depths%>%
+thermo_depths_sum <- thermo_depths%>%
   group_by(LakeID)%>%
   dplyr::mutate(count_unstrat_tot = sum(count_unstrat),
                 n = sum(n))%>%
@@ -119,14 +119,14 @@ thermo_depths_sum = thermo_depths%>%
 Step 4: Calculate average values within each layer
 ```{r}
 #Add thermocline depths
-full_with_thermo = full_trimmed%>%
+full_with_thermo <- full_trimmed%>%
   mutate(Year = year(Date))%>%
   full_join(thermo_depths_sum)%>%
   filter(!is.na(epi_depth),
          !is.na(hypo_depth),
          )
 #Add discrete layer designations from data providers
-summer_layers = full_with_thermo%>%
+summer_layers <- full_with_thermo%>%
   mutate(Layer = ifelse(!is.na(Depth_m)&Depth_m<epi_depth, "EPI", NA),
          Layer = ifelse(is.na(Depth_m)&!is.na(Interval)&Interval=="EPILIMNION","EPI",Layer),
          Layer = ifelse(!is.na(Depth_m)&Depth_m>hypo_depth,"HYPO",Layer),
@@ -136,7 +136,7 @@ summer_layers = full_with_thermo%>%
   filter(!is.na(Layer))
 
 #Calculate averages
-summer_avgs = summer_layers%>%
+summer_avgs <- summer_layers%>%
   mutate(start_date = as.Date(paste0(year(Date),"-",month(start_date),"-",day(start_date))))%>%
   group_by(LakeID,Year, Layer)%>% #not separating by measurement location. Is this a problem?
   dplyr::summarize(TP_ugL = mean(TP_ugL, na.rm = T),
@@ -156,7 +156,7 @@ summer_avgs = summer_layers%>%
 
 Step 5: Add buoyancy frequency during the late-summer period
 ```{r}
-buoyancy = full_trimmed%>%
+buoyancy <- full_trimmed%>%
   group_by(Date, LakeID, Depth_m)%>%
   dplyr::summarize(Temp_C = mean(Temp_C, na.rm = T))%>%
   filter(!is.na(Temp_C))%>%
@@ -167,7 +167,7 @@ buoyancy = full_trimmed%>%
   group_by(Year,LakeID)%>%
   dplyr::summarize(buoyancy_freq = mean(buoyancy_freq,na.rm=T))
 
-summer_avgs = summer_avgs%>%
+summer_avgs <- summer_avgs%>%
   left_join(buoyancy)
 
 #All done!

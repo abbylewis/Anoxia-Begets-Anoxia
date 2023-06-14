@@ -33,21 +33,21 @@ with_temp = read.csv("../Compiled data/All_data_annual.csv")
 
 Step 2: Generate temp anomaly summary fig
 ```{r}
-zscore = function(data, na.rm = T){(data-mean(data, na.rm = na.rm))/sd(data, na.rm = na.rm)}
-do_anomaly_stat =with_temp%>%
+zscore <- function(data, na.rm = T){(data-mean(data, na.rm = na.rm))/sd(data, na.rm = na.rm)}
+do_anomaly_stat <- with_temp%>%
   group_by(LakeID)%>%
   mutate(hypo_do_anom = DO_mgL_HYPO-mean(DO_mgL_HYPO, na.rm = T),
          spr_temp = (temp_mar+temp_apr)/2,
          spr_temp_anom = spr_temp - mean(spr_temp, na.rm = T))
 
-cor_data = do_anomaly_stat%>%
+cor_data <- do_anomaly_stat%>%
   dplyr::select(hypo_do_anom,spr_temp_anom,Year)%>%
   na.omit()
 
 pcor.test(cor_data$hypo_do_anom, cor_data$spr_temp_anom,cor_data$Year,method = "spearman")$estimate
 
 jpeg("../Figures/DO and air temp anomaly - spring.jpg", width = 5, height = 3, res = 300, units = "in")
-do_air_sum = do_anomaly_stat%>%
+do_air_sum <- do_anomaly_stat%>%
   filter(!is.na(spr_temp_anom),
          !is.na(hypo_do_anom))%>%
   group_by(LakeID)%>%
@@ -86,14 +86,14 @@ dev.off()
 
 Step 3: Analyze the effect of monthly air temperature on hypolimnetic DO, VHOD, and temp dynamics
 ```{r}
-many_lake_temp_sum = with_temp%>%
+many_lake_temp_sum <- with_temp%>%
   pivot_longer(cols = contains("temp", ignore.case = F), names_to = "mon")%>%
   filter(!mon=="mean_temp")%>%
   mutate(mon = month(as.Date(paste0("2022-",substr(mon,6,8),"-01"), format = "%Y-%b-%d")),
          Year = ifelse(mon>=9,Year+1,Year))
 
 # DO
-many_lake_stat = many_lake_temp_sum%>%
+many_lake_stat <- many_lake_temp_sum%>%
   filter(!is.na(DO_mgL_HYPO),!is.na(mon), !is.na(value))%>%
   group_by(LakeID)%>%
   mutate(hypoxic = ifelse(max(DO_mgL_HYPO)<1,"yes","no"))%>%
@@ -108,21 +108,21 @@ many_lake_stat = many_lake_temp_sum%>%
 
 labs = c("N:     Sep\nS:     Mar","Oct\nApr","Nov\nMay","Dec\nJun","Jan\nJul","Feb\nAug","Mar\nSep","Apr\nOct","May\nNov","Jun\nDec","Jul\nJan","Aug\nFeb")
 
-anova_res = aov(do_temp~as.factor(mon),data=many_lake_stat)
+anova_res <- aov(do_temp~as.factor(mon),data=many_lake_stat)
 summary(anova_res)
-tukey = TukeyHSD(anova_res)
-cld = multcompLetters4(anova_res,tukey)$`as.factor(mon)`$Letters
-cld_df = data.frame(cld = cld, mon = names(cld))%>%
+tukey <- TukeyHSD(anova_res)
+cld <- multcompLetters4(anova_res,tukey)$`as.factor(mon)`$Letters
+cld_df <- data.frame(cld = cld, mon = names(cld))%>%
   mutate(mon = factor(as.numeric(mon), levels = c(9:12,1:8), labels = labs))
 
 
 jpeg("../Figures/DO and temp by month.jpg", width = 6, height = 4, res = 300, units = "in")
-do_temp_data = many_lake_stat%>%
+do_temp_data <- many_lake_stat%>%
   group_by(mon)%>%
   mutate(p = wilcox.test(do_temp)$p.value,
          n = n(),
          mon = factor(mon, levels = c(9:12,1:8),labels = labs))
-do_temp = do_temp_data%>%
+do_temp <- do_temp_data%>%
   ggplot(aes(x=mon, y = do_temp))+
   geom_boxplot(aes(color=p<0.001))+
   geom_text(aes(x = mon, label = cld, y = 1.08),
@@ -142,7 +142,7 @@ dev.off()
 ######## Hypo temp
 # Stratified hypo temp
 
-many_lake_stat = many_lake_temp_sum%>%
+many_lake_stat <- many_lake_temp_sum%>%
   filter(!is.na(strat_Temp_C_HYPO),!is.na(mon), !is.na(value))%>%
   group_by(LakeID, mon)%>%
   mutate(nyear = length(unique(Year)))%>%
@@ -151,14 +151,14 @@ many_lake_stat = many_lake_temp_sum%>%
          )%>%
   dplyr::summarize(temp_temp = pcor.test(strat_Temp_C_HYPO,value,Year,method = "spearman")$estimate,
             )
-anova_res = aov(temp_temp~as.factor(mon),data=many_lake_stat)
+anova_res <- aov(temp_temp~as.factor(mon),data=many_lake_stat)
 summary(anova_res)
-tukey = TukeyHSD(anova_res)
-cld = multcompLetters4(anova_res,tukey)$`as.factor(mon)`$Letters
-cld_df = data.frame(cld = cld, mon = names(cld))%>%
+tukey <- TukeyHSD(anova_res)
+cld <- multcompLetters4(anova_res,tukey)$`as.factor(mon)`$Letters
+cld_df <- data.frame(cld = cld, mon = names(cld))%>%
   mutate(mon = factor(as.numeric(mon), levels = c(9:12,1:8), labels = labs))
 
-temp_temp_data = many_lake_temp_sum%>%
+temp_temp_data <- many_lake_temp_sum%>%
   group_by(LakeID, mon)%>%
   filter(!is.na(strat_Temp_C_HYPO),!is.na(mon), !is.na(value))%>%
   mutate(nyear = length(unique(Year)))%>%
@@ -174,7 +174,7 @@ temp_temp_data = many_lake_temp_sum%>%
 unique(temp_temp_data$LakeID)
 
 jpeg("../Figures/Air and strat hypo temp by month.jpg", width = 6, height = 4, res = 300, units = "in")
-temp_temp = temp_temp_data%>%
+temp_temp <- temp_temp_data%>%
   ggplot(aes(x=mon, y = temp_temp))+
   geom_boxplot(aes(color=p<0.001))+
   geom_text(aes(x = mon, label = cld, y = 1.08),
@@ -189,7 +189,7 @@ temp_temp = temp_temp_data%>%
 temp_temp
 dev.off()
 
-many_lake_stat = many_lake_temp_sum%>%
+many_lake_stat <- many_lake_temp_sum%>%
   filter(!is.na(DO_demand_mgLd_HYPO),!is.na(mon), !is.na(value))%>%
   group_by(LakeID, mon)%>%
   mutate(nyear = length(unique(Year)))%>%
@@ -198,15 +198,15 @@ many_lake_stat = many_lake_temp_sum%>%
          )%>%
   dplyr::summarize(temp_demand = pcor.test(DO_demand_mgLd_HYPO,value,Year,method = "spearman")$estimate,
             )
-anova_res = aov(temp_demand~as.factor(mon),data=many_lake_stat)
+anova_res <- aov(temp_demand~as.factor(mon),data=many_lake_stat)
 summary(anova_res)
-tukey = TukeyHSD(anova_res)
-cld = multcompLetters4(anova_res,tukey)$`as.factor(mon)`$Letters
-cld_df = data.frame(cld = cld, mon = names(cld))%>%
+tukey <- TukeyHSD(anova_res)
+cld <- multcompLetters4(anova_res,tukey)$`as.factor(mon)`$Letters
+cld_df <- data.frame(cld = cld, mon = names(cld))%>%
   mutate(mon = factor(as.numeric(mon), levels = c(9:12,1:8), labels = labs))
 
 jpeg("../Figures/Demand and air temp by month.jpg", width = 6, height = 4, res = 300, units = "in")
-temp_demand_data = many_lake_temp_sum%>%
+temp_demand_data <- many_lake_temp_sum%>%
   group_by(LakeID, mon)%>%
   filter(!is.na(DO_demand_mgLd_HYPO),!is.na(mon), !is.na(value))%>%
   mutate(nyear = length(unique(Year)))%>%
@@ -220,7 +220,7 @@ temp_demand_data = many_lake_temp_sum%>%
          n = n(),
          mon = factor(mon, levels = c(9:12,1:8),labels = labs))
    
-temp_demand = temp_demand_data%>%
+temp_demand <- temp_demand_data%>%
   ggplot(aes(x=mon, y = demand_temp))+
   geom_boxplot(aes(color=p<0.001))+
   geom_text(aes(x = mon, label = cld, y = 1.08),

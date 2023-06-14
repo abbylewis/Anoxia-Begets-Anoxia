@@ -34,12 +34,12 @@ library(tidyverse)
 library(lubridate)
 source("lmer_functions.R")
 
-POSTER=F #Set global option: Should figures be designed for a poster? Or for the manuscript
+POSTER = F #Set global option: Should figures be designed for a poster? Or for the manuscript
 
 set.seed(47) #Set seed so points jitter the same way each time
 
 #Load saved data
-with_temp = read.csv("../Compiled data/All_data_annual.csv")
+with_temp <- read.csv("../Compiled data/All_data_annual.csv")
 ```
 
 
@@ -53,7 +53,7 @@ cummean.na <- function(x, na.rm = T) {
   return(op)
 }
 
-with_lags = with_temp%>%
+with_lags <- with_temp%>%
   unique()%>%
   group_by(LakeID)%>%
   arrange(LakeID,Year)%>%
@@ -73,14 +73,14 @@ with_lags = with_temp%>%
          lag_is_last_year = ifelse(lag(Year)==(Year-1),T,F))%>%
   filter(lag_is_last_year)
 
-dataset=with_lags
-row.names(dataset)=paste(dataset$LakeID, dataset$Year)
+dataset <- with_lags
+row.names(dataset) <- paste(dataset$LakeID, dataset$Year)
 
-data_log_chla = dataset%>%
+data_log_chla <- dataset%>%
   mutate(Chla_ugL_EPI=log(Chla_ugL_EPI),
          chla_lag = log(chla_lag))
 
-data_log_nuts = dataset%>%
+data_log_nuts <- dataset%>%
   mutate(Chla_ugL_EPI=log(Chla_ugL_EPI),
          chla_lag = log(chla_lag),
          TP_ugL_EPI = log(TP_ugL_EPI),
@@ -95,27 +95,27 @@ data_log_nuts = dataset%>%
          epi_n_lag = log(epi_n_lag),
          hypo_n_lag = log(hypo_n_lag)) #produces NAs because of two EPI TN == 0
 
-data_no_anoxic = dataset%>%
+data_no_anoxic <- dataset%>%
   filter(anoxic==F)
 
 dataset%>%
   group_by(anoxic)%>%
   dplyr::summarize(anoxic = length(unique(LakeID)))
 
-data_log_chla_no_anoxic = dataset%>%
+data_log_chla_no_anoxic <- dataset%>%
   mutate(Chla_ugL_EPI=log(Chla_ugL_EPI),
          chla_lag = log(chla_lag))%>%
   filter(anoxic==F)
 
-data_log_nuts_no_anoxic = data_log_nuts%>%
+data_log_nuts_no_anoxic <- data_log_nuts%>%
   filter(anoxic==F)
 ```
 
 
 Step 3: Model selection
 ```{r}
-responses = c("DO_demand_mgLd_HYPO")
-potential_drivers = c("Chla_ugL_EPI",
+responses <- c("DO_demand_mgLd_HYPO")
+potential_drivers <- c("Chla_ugL_EPI",
                       "chla_lag",
                       "strat_Temp_C_HYPO",
                       #"DOC_mgL_HYPO", #Adding this limits data availability, making effects more difficult to detect. HOWEVER this does not come out as important
@@ -123,17 +123,17 @@ potential_drivers = c("Chla_ugL_EPI",
                       "strat_buoyancy_freq_EPI" #all layers are the same
                       )
 aic_calculator_lmer(data_log_chla,responses,potential_drivers, interaction = "+")
-selected_drivers = c("Chla_ugL_EPI","chla_lag","strat_Temp_C_HYPO","SA_vol_ratio_HYPO")
-std_data = standardize_data(data_log_chla,responses,selected_drivers)
-all_lakes_vhod = mod_by_lake(data_log_chla,responses,selected_drivers, interaction = "+")
-mod_lmer = lmer(DO_demand_mgLd_HYPO~Chla_ugL_EPI+chla_lag+strat_Temp_C_HYPO+SA_vol_ratio_HYPO+(1|LakeID), data = std_data)
+selected_drivers <- c("Chla_ugL_EPI","chla_lag","strat_Temp_C_HYPO","SA_vol_ratio_HYPO")
+std_data <- standardize_data(data_log_chla,responses,selected_drivers)
+all_lakes_vhod <- mod_by_lake(data_log_chla,responses,selected_drivers, interaction = "+")
+mod_lmer <- lmer(DO_demand_mgLd_HYPO~Chla_ugL_EPI+chla_lag+strat_Temp_C_HYPO+SA_vol_ratio_HYPO+(1|LakeID), data = std_data)
 vif(mod_lmer)
-vhod = plot_effects_lmer(mod_lmer,"Oxygen demand (mg/L/d)", poster = POSTER)
-vhod_ridge = plot_effects_by_lake_lmer_ridge(all_lakes_vhod,var_name = "Oxygen demand (mg/L/d)",mod_lmer, poster = POSTER)
+vhod <- plot_effects_lmer(mod_lmer,"Oxygen demand (mg/L/d)", poster = POSTER)
+vhod_ridge <- plot_effects_by_lake_lmer_ridge(all_lakes_vhod,var_name = "Oxygen demand (mg/L/d)",mod_lmer, poster = POSTER)
 
 ###
-responses = c("DO_mgL_HYPO")
-potential_drivers = c("DO_demand_mgLd_HYPO",
+responses <- c("DO_mgL_HYPO")
+potential_drivers <- c("DO_demand_mgLd_HYPO",
                       "spring_temp",
                       "summer_temp",
                       "winter_temp",
@@ -141,47 +141,56 @@ potential_drivers = c("DO_demand_mgLd_HYPO",
                       "DO_date_HYPO"
                       )
 aic_calculator_lmer(data_no_anoxic,responses,potential_drivers, interaction = "+")
-selected_drivers = c("DO_demand_mgLd_HYPO","spring_temp","Temp_C_HYPO","DO_date_HYPO")
-std_data = standardize_data(data_no_anoxic,responses,selected_drivers)
-all_lakes_do = mod_by_lake(data_no_anoxic,responses,selected_drivers, interaction = "+")
-mod_lmer = lmer(DO_mgL_HYPO~spring_temp+DO_demand_mgLd_HYPO+Temp_C_HYPO+DO_date_HYPO+(1|LakeID), data = std_data) 
+selected_drivers <- c("DO_demand_mgLd_HYPO","spring_temp","Temp_C_HYPO","DO_date_HYPO")
+std_data <- standardize_data(data_no_anoxic,responses,selected_drivers)
+all_lakes_do <- mod_by_lake(data_no_anoxic,responses,selected_drivers, interaction = "+")
+mod_lmer <- lmer(DO_mgL_HYPO~spring_temp+DO_demand_mgLd_HYPO+Temp_C_HYPO+DO_date_HYPO+(1|LakeID), data = std_data) 
 vif(mod_lmer)
-hypo_do = plot_effects_lmer(mod_lmer,"Hypolimnetic DO (mg/L)", poster = POSTER) 
-hypo_do_ridge = plot_effects_by_lake_lmer_ridge(all_lakes_do,"Hypolimnetic DO (mg/L)",mod_lmer, poster = POSTER)
+hypo_do <- plot_effects_lmer(mod_lmer,"Hypolimnetic DO (mg/L)", poster = POSTER) 
+hypo_do_ridge <- plot_effects_by_lake_lmer_ridge(all_lakes_do,"Hypolimnetic DO (mg/L)",mod_lmer, poster = POSTER)
 #SEGMENTED
-std_data = standardize_data(dataset,responses,selected_drivers) #Add in anoxic lakes here to make a point
-mod_seg = lme(DO_mgL_HYPO~spring_temp+DO_demand_mgLd_HYPO+Temp_C_HYPO+DO_date_HYPO, random=~1|LakeID, data = std_data) #for some reason lmer doesn't work here
-seglme = segmented.lme(mod_seg, random=list(LakeID=pdDiag(~1)), seg.Z = ~DO_demand_mgLd_HYPO, psi = 1)
+std_data <- standardize_data(dataset,responses,selected_drivers) #Add in anoxic lakes here to make a point
+mod_seg <- lme(DO_mgL_HYPO~spring_temp+DO_demand_mgLd_HYPO+Temp_C_HYPO+DO_date_HYPO, random=~1|LakeID, data = std_data) #for some reason lmer doesn't work here
+seglme <- segmented.lme(mod_seg, random=list(LakeID=pdDiag(~1)), seg.Z = ~DO_demand_mgLd_HYPO, psi = 1)
 #G0 is the breakpoint, U is added to the coefficient for DO_demand_mgLd_HYPO to get the slope after the breakpoint
 #To "un-standardize" the breakpoint:
-dataset_filt = dataset%>%
+dataset_filt <- dataset%>%
   ungroup()%>%
   dplyr::select(all_of(c(selected_drivers,responses,"LakeID")))%>%
   filter(if_all(where(is.numeric),is.finite))
-mu_do = mean(dataset_filt$DO_demand_mgLd_HYPO)
-sd_do = sd(dataset_filt$DO_demand_mgLd_HYPO)
-break_untrans = round(unique(seglme$fixed.eta.psi)*sd_do+mu_do,1)
+mu_do <- mean(dataset_filt$DO_demand_mgLd_HYPO)
+sd_do <- sd(dataset_filt$DO_demand_mgLd_HYPO)
+break_untrans <- round(unique(seglme$fixed.eta.psi)*sd_do+mu_do,1)
 #To plot
-effects = data.frame(seglme$lme.fit.noG$coefficients$fixed)
-colnames(effects) = "Estimate"
-effects$Var = row.names(effects)
-confs = data.frame(t(confint(seglme)))
-confs$Var = row.names(confs)
-effects2 = effects%>%
+effects <- data.frame(seglme$lme.fit.noG$coefficients$fixed)
+colnames(effects) <- "Estimate"
+effects$Var <- row.names(effects)
+confs <- data.frame(t(confint(seglme)))
+confs$Var <- row.names(confs)
+effects2 <- effects%>%
   left_join(confs)%>%
   rename(xmin = X2.5.,
          xmax = X97.5.)%>%
   mutate(radius = Estimate-xmin,
          radius2 = xmax-Estimate)
-effects2$Estimate[effects2$Var=="U"]=effects2$Estimate[effects2$Var=="DO_demand_mgLd_HYPO"]+effects2$Estimate[effects2$Var=="U"]
-effects2$xmin[effects2$Var=="U"]=effects2$Estimate[effects2$Var=="U"]-sqrt(effects2$radius[effects2$Var=="DO_demand_mgLd_HYPO"]^2+effects2$radius[effects2$Var=="U"]^2)
-effects2$xmax[effects2$Var=="U"]=effects2$Estimate[effects2$Var=="U"]+sqrt(effects2$radius2[effects2$Var=="DO_demand_mgLd_HYPO"]^2+effects2$radius2[effects2$Var=="U"]^2)
+effects2$Estimate[effects2$Var=="U"] <- 
+  effects2$Estimate[effects2$Var=="DO_demand_mgLd_HYPO"]+
+  effects2$Estimate[effects2$Var=="U"]
+effects2$xmin[effects2$Var=="U"] <- 
+  effects2$Estimate[effects2$Var=="U"]-
+  sqrt(effects2$radius[effects2$Var=="DO_demand_mgLd_HYPO"]^2+
+         effects2$radius[effects2$Var=="U"]^2)
+effects2$xmax[effects2$Var=="U"] <- 
+  effects2$Estimate[effects2$Var=="U"]+
+  sqrt(effects2$radius2[effects2$Var=="DO_demand_mgLd_HYPO"]^2+
+         effects2$radius2[effects2$Var=="U"]^2)
+
 if(POSTER){
-  effects2$Var[effects2$Var=="U"]=paste0("VHOD\n(> ",break_untrans," mg/L/d)")
-  effects2$Var[effects2$Var=="DO_mgL_HYPO"]=paste0("VHOD\n(< ",break_untrans," mg/L/d)")
+  effects2$Var[effects2$Var=="U"] <- paste0("VHOD\n(> ",break_untrans," mg/L/d)")
+  effects2$Var[effects2$Var=="DO_mgL_HYPO"] <- paste0("VHOD\n(< ",break_untrans," mg/L/d)")
 } else {
-  effects2$Var[effects2$Var=="U"]=paste0("VHOD where\nVHOD > ",break_untrans," mg/L/d")
-  effects2$Var[effects2$Var=="DO_demand_mgLd_HYPO"]=paste0("VHOD where\nVHOD < ",break_untrans," mg/L/d")
+  effects2$Var[effects2$Var=="U"] <- paste0("VHOD where\nVHOD > ",break_untrans," mg/L/d")
+  effects2$Var[effects2$Var=="DO_demand_mgLd_HYPO"] <- paste0("VHOD where\nVHOD < ",break_untrans," mg/L/d")
 }
 
 dataset%>%
@@ -197,8 +206,8 @@ ggsave(paste0("../Figures/DO_VHOD.jpeg"),
        width = 4, height = 4, units = "in")
 
 ###
-responses = c("VHOD5_mgLd_HYPO")
-potential_drivers = c("Chla_ugL_EPI",
+responses <- c("VHOD5_mgLd_HYPO")
+potential_drivers <- c("Chla_ugL_EPI",
                       "chla_lag",
                       #"DOC_mgL_HYPO",
                       "spring_temp",
@@ -206,10 +215,10 @@ potential_drivers = c("Chla_ugL_EPI",
                       "strat_buoyancy_freq_EPI"
                       )
 aic_calculator_lmer(data_log_chla,responses,potential_drivers, interaction = "+")
-selected_drivers = c("Chla_ugL_EPI","chla_lag","strat_buoyancy_freq_EPI")
-std_data = standardize_data(data_log_chla,responses,selected_drivers)
-all_lakes_vhod5 = mod_by_lake(data_log_chla,responses,selected_drivers, interaction = "+")
-mod_lmer = lmer(VHOD5_mgLd_HYPO~Chla_ugL_EPI+chla_lag+strat_buoyancy_freq_EPI+(1|LakeID), data = std_data) 
+selected_drivers <- c("Chla_ugL_EPI","chla_lag","strat_buoyancy_freq_EPI")
+std_data <-standardize_data(data_log_chla,responses,selected_drivers)
+all_lakes_vhod5 <- mod_by_lake(data_log_chla,responses,selected_drivers, interaction = "+")
+mod_lmer <- lmer(VHOD5_mgLd_HYPO~Chla_ugL_EPI+chla_lag+strat_buoyancy_freq_EPI+(1|LakeID), data = std_data) 
 #No need to run VIF here because there is only one driver
 confint(mod_lmer)
 summary(mod_lmer)
@@ -217,8 +226,8 @@ plot_effects_lmer(mod_lmer,"Temperature-corrected oxygen demand")
 plot_effects_by_lake_lmer_ridge(all_lakes_vhod5,"Temperature-corrected oxygen demand",mod_lmer)
 
 ###
-responses = c("strat_TP_ugL_EPI")
-potential_drivers = c("TP_ugL_HYPO",
+responses <- c("strat_TP_ugL_EPI")
+potential_drivers <- c("TP_ugL_HYPO",
                       "hypo_p_lag",
                       "epi_p_lag",
                       "spring_precip",
@@ -228,18 +237,18 @@ potential_drivers = c("TP_ugL_HYPO",
                       "strat_TP_date_EPI"
                       )
 aic_calculator_lmer(data_log_nuts,responses,potential_drivers, interaction = "+")
-selected_drivers = c("TP_ugL_HYPO","hypo_p_lag","epi_p_lag","spring_precip","summer_precip","strat_TP_date_EPI")
-std_data = standardize_data(data_log_nuts,responses,selected_drivers)
-all_lakes_epiP = mod_by_lake(data_log_nuts,responses,selected_drivers, interaction = "+")
-mod_lmer = lmer(strat_TP_ugL_EPI~TP_ugL_HYPO+hypo_p_lag+epi_p_lag+spring_precip+summer_precip+strat_TP_date_EPI+(1|LakeID), data = std_data)
+selected_drivers <- c("TP_ugL_HYPO","hypo_p_lag","epi_p_lag","spring_precip","summer_precip","strat_TP_date_EPI")
+std_data <- standardize_data(data_log_nuts,responses,selected_drivers)
+all_lakes_epiP <- mod_by_lake(data_log_nuts,responses,selected_drivers, interaction = "+")
+mod_lmer <- lmer(strat_TP_ugL_EPI~TP_ugL_HYPO+hypo_p_lag+epi_p_lag+spring_precip+summer_precip+strat_TP_date_EPI+(1|LakeID), data = std_data)
 vif(mod_lmer)
-epi_p = plot_effects_lmer(mod_lmer,"Epilimnetic TP (µg/L)", poster = POSTER) 
-epi_p_ridge = plot_effects_by_lake_lmer_ridge(all_lakes_epiP,"Epilimnetic TP (µg/L)",mod_lmer, poster = POSTER)
+epi_p <- plot_effects_lmer(mod_lmer,"Epilimnetic TP (µg/L)", poster = POSTER) 
+epi_p_ridge <- plot_effects_by_lake_lmer_ridge(all_lakes_epiP,"Epilimnetic TP (µg/L)",mod_lmer, poster = POSTER)
 
 
 ###
-responses = c("TP_ugL_HYPO")
-potential_drivers = c("DO_mgL_HYPO",
+responses <- c("TP_ugL_HYPO")
+potential_drivers <- c("DO_mgL_HYPO",
                       "strat_TP_ugL_EPI",
                       "strat_buoyancy_freq_EPI",
                       "strat_Temp_C_HYPO",
@@ -249,45 +258,53 @@ potential_drivers = c("DO_mgL_HYPO",
                       "TP_date_HYPO"
                       )
 aic_calculator_lmer(data_log_nuts,responses,potential_drivers, interaction = "+")
-selected_drivers = c("DO_mgL_HYPO","strat_TP_ugL_EPI","winter_precip")
-std_data = standardize_data(data_log_nuts,responses,selected_drivers)
-all_lakes_hypoP = mod_by_lake(data_log_nuts,responses,selected_drivers, interaction = "+")
-mod_lmer = lmer(TP_ugL_HYPO~DO_mgL_HYPO+strat_TP_ugL_EPI+winter_precip+(1|LakeID), data = std_data) 
+selected_drivers <- c("DO_mgL_HYPO","strat_TP_ugL_EPI","winter_precip")
+std_data <-standardize_data(data_log_nuts,responses,selected_drivers)
+all_lakes_hypoP <- mod_by_lake(data_log_nuts,responses,selected_drivers, interaction = "+")
+mod_lmer <- lmer(TP_ugL_HYPO~DO_mgL_HYPO+strat_TP_ugL_EPI+winter_precip+(1|LakeID), data = std_data) 
 vif(mod_lmer)
-hypo_p = plot_effects_lmer(mod_lmer,"Hypolimnetic TP (µg/L)", poster = POSTER) 
-hypo_p_ridge = plot_effects_by_lake_lmer_ridge(all_lakes_hypoP,"Hypolimnetic TP (µg/L)",mod_lmer, poster = POSTER)
+hypo_p <- plot_effects_lmer(mod_lmer,"Hypolimnetic TP (µg/L)", poster = POSTER) 
+hypo_p_ridge <- plot_effects_by_lake_lmer_ridge(all_lakes_hypoP,"Hypolimnetic TP (µg/L)",mod_lmer, poster = POSTER)
 #SEGMENTED
-mod_seg = lme(TP_ugL_HYPO~DO_mgL_HYPO+strat_TP_ugL_EPI+winter_precip, random=~1|LakeID, data = data_log_nuts%>%
+mod_seg <- lme(TP_ugL_HYPO~DO_mgL_HYPO+strat_TP_ugL_EPI+winter_precip, random=~1|LakeID, data = data_log_nuts%>%
   dplyr::select(all_of(c(selected_drivers,responses,"LakeID")))%>%
   filter(if_all(where(is.numeric),is.finite))) #for some reason lmer doesn't work here
-seglme = segmented.lme(mod_seg, random=list(LakeID=pdDiag(~1)), seg.Z = ~DO_mgL_HYPO, psi = 1)
+seglme <- segmented.lme(mod_seg, random=list(LakeID=pdDiag(~1)), seg.Z = ~DO_mgL_HYPO, psi = 1)
 #G0 is the breakpoint, U is added to the coefficient for DO_mgL_HYPO to get the slope after the breakpoint
-break_untrans = round(unique(seglme$fixed.eta.psi),1)
+break_untrans <- round(unique(seglme$fixed.eta.psi),1)
 summary(seglme)
 #To plot
-effects = data.frame(seglme$lme.fit.noG$coefficients$fixed)
-colnames(effects) = "Estimate"
-effects$Var = row.names(effects)
-confs = data.frame(t(confint(seglme)))
-confs$Var = row.names(confs)
-effects2 = effects%>%
+effects <- data.frame(seglme$lme.fit.noG$coefficients$fixed)
+colnames(effects) <- "Estimate"
+effects$Var <- row.names(effects)
+confs <- data.frame(t(confint(seglme)))
+confs$Var <- row.names(confs)
+effects2 <- effects%>%
   left_join(confs)%>%
   rename(xmin = X2.5.,
          xmax = X97.5.)%>%
   mutate(radius = Estimate-xmin,
          radius2 = xmax-Estimate)
-effects2$Estimate[effects2$Var=="U"]=effects2$Estimate[effects2$Var=="DO_mgL_HYPO"]+effects2$Estimate[effects2$Var=="U"]
-effects2$xmin[effects2$Var=="U"]=effects2$Estimate[effects2$Var=="U"]-sqrt(effects2$radius[effects2$Var=="DO_mgL_HYPO"]^2+effects2$radius[effects2$Var=="U"]^2)
-effects2$xmax[effects2$Var=="U"]=effects2$Estimate[effects2$Var=="U"]+sqrt(effects2$radius2[effects2$Var=="DO_mgL_HYPO"]^2+effects2$radius2[effects2$Var=="U"]^2)
+effects2$Estimate[effects2$Var=="U"] <- 
+  effects2$Estimate[effects2$Var=="DO_mgL_HYPO"]+
+  effects2$Estimate[effects2$Var=="U"]
+effects2$xmin[effects2$Var=="U"] <- 
+  effects2$Estimate[effects2$Var=="U"]-
+  sqrt(effects2$radius[effects2$Var=="DO_mgL_HYPO"]^2+
+         effects2$radius[effects2$Var=="U"]^2)
+effects2$xmax[effects2$Var=="U"] <- 
+  effects2$Estimate[effects2$Var=="U"]+
+  sqrt(effects2$radius2[effects2$Var=="DO_mgL_HYPO"]^2+
+         effects2$radius2[effects2$Var=="U"]^2)
 if(POSTER){
-  effects2$Var[effects2$Var=="U"]=paste0("Bottom-water oxygen\n(> ",break_untrans," mg/L)")
-  effects2$Var[effects2$Var=="DO_mgL_HYPO"]=paste0("Bottom-water oxygen\n(< ",break_untrans," mg/L)")
+  effects2$Var[effects2$Var=="U"] <- paste0("Bottom-water oxygen\n(> ",break_untrans," mg/L)")
+  effects2$Var[effects2$Var=="DO_mgL_HYPO"] <- paste0("Bottom-water oxygen\n(< ",break_untrans," mg/L)")
 } else {
-  effects2$Var[effects2$Var=="U"]=paste0("Hypo. DO where\nDO > ",break_untrans," mg/L")
-  effects2$Var[effects2$Var=="DO_mgL_HYPO"]=paste0("Hypo. DO where\nDO < ",break_untrans," mg/L")
+  effects2$Var[effects2$Var=="U"] <- paste0("Hypo. DO where\nDO > ",break_untrans," mg/L")
+  effects2$Var[effects2$Var=="DO_mgL_HYPO"] <- paste0("Hypo. DO where\nDO < ",break_untrans," mg/L")
 }
 
-status = data_log_nuts%>%
+status <- data_log_nuts%>%
   group_by(LakeID)%>%
   filter(!is.na(DO_mgL_HYPO))%>%
   dplyr::summarize(status = ifelse(max(DO_mgL_HYPO,na.rm = T)<1, "Anoxic\n(max. DO < 1)",
@@ -295,21 +312,21 @@ status = data_log_nuts%>%
                                           "Oxic\n(min. DO > 1)")))
 
 ###
-responses = c("Chla_ugL_EPI")
-potential_drivers = c("strat_TP_ugL_EPI",
+responses <- c("Chla_ugL_EPI")
+potential_drivers <- c("strat_TP_ugL_EPI",
                       "strat_TN_ugL_EPI", 
                       "spring_temp",
                       "summer_temp",
                       "Chla_date_EPI")
 aic_calculator_lmer(data_log_nuts,responses,potential_drivers, interaction = "+")
-selected_drivers = c("spring_temp","strat_TP_ugL_EPI")
-std_data = standardize_data(data_log_nuts,responses,selected_drivers)
-all_lakes_chla = mod_by_lake(data_log_nuts,responses,selected_drivers, interaction = "+")
-mod_lmer = lmer(Chla_ugL_EPI~spring_temp+strat_TP_ugL_EPI+(1|LakeID), data = std_data) 
+selected_drivers <- c("spring_temp","strat_TP_ugL_EPI")
+std_data <- standardize_data(data_log_nuts,responses,selected_drivers)
+all_lakes_chla <- mod_by_lake(data_log_nuts,responses,selected_drivers, interaction = "+")
+mod_lmer <- lmer(Chla_ugL_EPI~spring_temp+strat_TP_ugL_EPI+(1|LakeID), data = std_data) 
 summary(mod_lmer)
 vif(mod_lmer)
-epi_chla = plot_effects_lmer(mod_lmer,"Epilimnetic chl-a (µg/L)", poster = POSTER) 
-epi_chla_ridge = plot_effects_by_lake_lmer_ridge(all_lakes_chla,"Epilimnetic chl-a (µg/L)",mod_lmer, poster = POSTER)
+epi_chla <- plot_effects_lmer(mod_lmer,"Epilimnetic chl-a (µg/L)", poster = POSTER) 
+epi_chla_ridge <- plot_effects_by_lake_lmer_ridge(all_lakes_chla,"Epilimnetic chl-a (µg/L)",mod_lmer, poster = POSTER)
 ```
 
 
@@ -479,7 +496,7 @@ dev.off()
 
 Step 5: Driver analysis
 ```{r}
-incomplete = all_lakes_chla%>%
+incomplete <- all_lakes_chla%>%
   dplyr::select(strat_TP_ugL_EPI,LakeID)%>%
   full_join(all_lakes_epiP%>%
               dplyr::select(TP_ugL_HYPO, hypo_p_lag,LakeID))%>%
@@ -490,10 +507,10 @@ incomplete = all_lakes_chla%>%
   full_join(all_lakes_vhod%>%
               dplyr::select(chla_lag,Chla_ugL_EPI,LakeID))
 
-hydro = read.csv("../External data/hydrolakes_full.csv")
-lat_long = read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/fadd3eaa25b5fdd1fc4efba70e660579")
+hydro <- read.csv("../External data/hydrolakes_full.csv")
+lat_long <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/fadd3eaa25b5fdd1fc4efba70e660579")
 
-means = with_temp%>%
+means <- with_temp%>%
   group_by(LakeID)%>%
   dplyr::summarize(mean_do = mean(DO_mgL_HYPO,na.rm=T),
                    median_do = median(DO_mgL_HYPO,na.rm=T),
@@ -523,7 +540,7 @@ means = with_temp%>%
                    mean_air_temp = mean(mean_temp, na.rm=T),
                    mean_bf = mean(strat_buoyancy_freq_EPI,na.rm=T))
 
-for_mlr = incomplete%>%
+for_mlr <- incomplete%>%
   left_join(lat_long, by = c("LakeID"))%>%
   left_join(means)%>%
   left_join(hydro%>%
@@ -539,15 +556,15 @@ for_mlr = incomplete%>%
          Lake_type = factor(Lake_type),
          tn_tp_ratio = mean_epi_n/mean_epi_p)
 
-potential_drivers = c("log_MeanDepth_m",
+potential_drivers <- c("log_MeanDepth_m",
                       "log_MaximumDepth_m",
                       "log_SurfaceArea_ha",
                       "log_Res_time",
                       "Elevation_m",
                       "log_hypoP"
                       )
-responses = c("TP_ugL_HYPO") #Nothing comes out cleanly
-#responses = c("hypo_p_lag") #Nothing comes out cleanly if we remove one outlier %>%filter(hypo_p_lag>-1)
+responses <- c("TP_ugL_HYPO") #Nothing comes out cleanly
+#responses <- c("hypo_p_lag") #Nothing comes out cleanly if we remove one outlier %>%filter(hypo_p_lag>-1)
 aic_calculator_onevar(for_mlr,responses,potential_drivers)
 summary(lm(TP_ugL_HYPO~log_Res_time, data = for_mlr)) 
 
@@ -563,7 +580,7 @@ for_mlr%>%
   ylab("Coefficient for the\neffect of hypo. TP (t-1) on epi TP")+
   xlab("Residence time (d)")
 
-potential_drivers = c("log_MeanDepth_m",
+potential_drivers <- c("log_MeanDepth_m",
                       "log_MaximumDepth_m",
                       "log_SurfaceArea_ha",
                       "log_Res_time",
@@ -571,12 +588,12 @@ potential_drivers = c("log_MeanDepth_m",
                       "log_epiP"
                       #"tn_tp_ratio" #removing for the sake of having a standardized approach
                       )
-responses = c("strat_TP_ugL_EPI")
+responses <- c("strat_TP_ugL_EPI")
 aic_calculator_onevar(for_mlr,responses,potential_drivers)
 summary(lm(strat_TP_ugL_EPI~log_epiP, data = for_mlr)) #Take home: epi P has a positive relationship
 
 jpeg("../Figures/Effect of TP on chl-a.jpg", width = 4, height = 4, res = 300, units = "in")
-chla = for_mlr%>%
+chla <- for_mlr%>%
   filter(!is.na(strat_TP_ugL_EPI))%>%
   ggplot(aes(x=mean_epi_p,y=strat_TP_ugL_EPI))+
   geom_point()+
@@ -621,19 +638,19 @@ for_mlr%>%
   ylab("SD epi. TP (µg/L)")
 dev.off()
 
-potential_drivers = c("log_MeanDepth_m",
+potential_drivers <- c("log_MeanDepth_m",
                       "log_MaximumDepth_m",
                       "log_SurfaceArea_ha",
                       "log_Res_time",
                       "Elevation_m",
                       "mean_do"
                       )
-responses = c("DO_mgL_HYPO")
+responses <- c("DO_mgL_HYPO")
 aic_calculator_onevar(for_mlr,responses,potential_drivers)
 summary(lm(DO_mgL_HYPO~log_Res_time, data = for_mlr)) #Take home: nothing comes out cleanly
 
 jpeg("../Figures/Effect of DO on TP.jpg", width = 4.5, height = 4, res = 300, units = "in")
-do = for_mlr%>%
+do <- for_mlr%>%
   mutate(oxy_class = ifelse(min_do>1,"Oxic\n(min. DO > 1 mg/L)",ifelse(max_do<1,"Anoxic\n(max. DO < 1 mg/L)","Variable")),
          oxy_class = factor(oxy_class, levels = c("Anoxic\n(max. DO < 1 mg/L)","Variable","Oxic\n(min. DO > 1 mg/L)")))%>%
   filter(!is.na(DO_mgL_HYPO))%>%
@@ -650,19 +667,19 @@ do = for_mlr%>%
 do
 dev.off()
 
-potential_drivers = c("log_MeanDepth_m",
+potential_drivers <- c("log_MeanDepth_m",
                       "log_MaximumDepth_m",
                       "log_SurfaceArea_ha",
                       "log_Res_time",
                       "Elevation_m",
                       "mean_demand"
                       )
-responses = c("DO_demand_mgLd_HYPO")
+responses <- c("DO_demand_mgLd_HYPO")
 aic_calculator_onevar(for_mlr,responses,potential_drivers)
 summary(lm(DO_demand_mgLd_HYPO~log_SurfaceArea_ha, data = for_mlr)) #Take home: surface area is most important
 
 jpeg("../Figures/Effect of VHOD on DO.jpg", width = 4, height = 4, res = 300, units = "in")
-demand = for_mlr%>%
+demand <- for_mlr%>%
   filter(!is.na(DO_demand_mgLd_HYPO),
          !is.na(SurfaceArea_ha))%>%
   ggplot(aes(x=SurfaceArea_ha,y=DO_demand_mgLd_HYPO))+
@@ -678,17 +695,17 @@ demand = for_mlr%>%
 demand
 dev.off()
 
-potential_drivers = c("log_MeanDepth_m",
+potential_drivers <- c("log_MeanDepth_m",
                       "log_MaximumDepth_m",
                       "log_SurfaceArea_ha",
                       "log_Res_time",
                       "Elevation_m",
                       "mean_chla")
-responses = c("chla_lag")
-responses = c("Chla_ugL_EPI")#Nothing comes out cleanly
+responses <- c("chla_lag")
+responses <- c("Chla_ugL_EPI")#Nothing comes out cleanly
 #aic_calculator_onevar(for_mlr,responses,potential_drivers)
 summary(lm(chla_lag~log_Res_time, data = for_mlr))
-vhod = for_mlr%>%
+vhod <- for_mlr%>%
   filter(!is.na(chla_lag))%>%
   ggplot(aes(x = Res_time,y=chla_lag))+
   scale_x_log10()+
@@ -708,13 +725,27 @@ ggarrange(ggarrange(chla+stat_poly_eq(label.x = .1, label.y = 0.99),
                     labels = c("C","D"), widths = c(1,1.3)), 
           nrow = 2)
 dev.off()
+
+jpeg("../Figures/Driver analysis.jpg", width = 7, height = 5, res = 300, units = "in")
+ggarrange(ggarrange(chla+stat_poly_eq(label.x = .1, label.y = 0.99),
+                    vhod+stat_poly_eq(label.x = .1, label.y = 0.91),
+                    labels = c("A","B"),
+                    label.x = -0.01),
+          ggarrange(demand+stat_poly_eq(label.x = .8, data = .%>%filter(MaximumDepth_m<50)),
+                    ggplot()+geom_blank()+theme_minimal(),
+                    labels = c("C", NA),
+                    label.x = -0.005,
+                    widths = c(0.64,0.36)),
+          nrow = 2
+          )
+dev.off()
 ```
 
 
 Step 6: DO/TP figure
 ```{r}
 jpeg("../Figures/DO TP.jpeg", width = 3, height = 3, res = 300, units = "in")
-do_tp = with_lags%>%
+do_tp <- with_lags%>%
   filter(!is.na(TP_ugL_HYPO))%>%
   ungroup()%>%
   mutate(label = paste0("n = ",n()," lake-years\nn = ",length(unique(LakeID))," lakes"),
@@ -733,7 +764,7 @@ do_tp
 dev.off()
 
 jpeg("../Figures/Depth TP.jpeg", width = 3, height = 3, res = 300, units = "in")
-depth_tp = with_lags%>%
+depth_tp <- with_lags%>%
   filter(!is.na(TP_ugL_HYPO),
          !is.na(depth_ratio_HYPO),
          !is.na(DO_mgL_HYPO))%>%
@@ -761,14 +792,14 @@ dev.off()
 
 Step 7: Before and after figure
 ```{r}
-total = with_temp%>%
+total <- with_temp%>%
   filter(!is.na(DO_mgL_HYPO))%>%
   group_by(LakeID)%>%
   filter(length(unique(Year))>=10)%>%
   ungroup()%>%
   summarize(length(unique(LakeID)))
 
-anoxic = with_temp%>%
+anoxic <- with_temp%>%
   filter(!is.na(DO_mgL_HYPO))%>%
   group_by(LakeID)%>%
   filter(length(unique(Year))>=10,
@@ -776,7 +807,7 @@ anoxic = with_temp%>%
   ungroup()
 length(unique(anoxic$LakeID))
 
-oxic = with_temp%>%
+oxic <- with_temp%>%
   filter(!is.na(DO_mgL_HYPO))%>%
   group_by(LakeID)%>%
   filter(length(unique(Year))>=10,
@@ -784,7 +815,7 @@ oxic = with_temp%>%
   ungroup()
 length(unique(oxic$LakeID))
 
-switch = with_temp%>%
+switch <- with_temp%>%
   filter(!is.na(DO_mgL_HYPO))%>%
   group_by(LakeID)%>%
   filter(length(unique(Year))>=10,
@@ -794,7 +825,7 @@ switch = with_temp%>%
   ungroup()
 length(unique(switch$LakeID))
 
-status_data = with_temp%>%
+status_data <- with_temp%>%
   group_by(LakeID)%>%
   arrange(LakeID,Year)%>%
   filter(!is.na(DO_mgL_HYPO))%>%
@@ -831,7 +862,7 @@ status_data%>%
   ylab("DO (mg/L)")
 dev.off()
 
-status_data_do = status_data%>%
+status_data_do <- status_data%>%
   filter(!is.na(DO_mgL_HYPO),
          abs(Year-anoxic_date)<=1)%>%
   group_by(LakeID)%>%

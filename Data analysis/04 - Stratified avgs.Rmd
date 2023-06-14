@@ -5,7 +5,7 @@ date: "2022-11-22"
 output: html_document
 ---
 
-This file loads temp/DO/productivity data and calculates mean concentrations of each focal variable during the summer stratified period. All code chunks must be run in order.
+This file loads temp/DO/productivity data, calculates summary statistics for the dataset, and calculates mean concentrations of each focal variable during the summer stratified period. All code chunks must be run in order.
 
 Table of contents:
 Step 1: Load data and packages
@@ -26,63 +26,32 @@ library(rLakeAnalyzer)
 source("thermo.depth.density.R")
 
 ## Load productivity data and metadata from EDI
-p = read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/0ece9d7b67cd49741ed7ee60192832e4")
-lat_long = read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/fadd3eaa25b5fdd1fc4efba70e660579")
+p <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/0ece9d7b67cd49741ed7ee60192832e4")
+lat_long <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/fadd3eaa25b5fdd1fc4efba70e660579")
 #Load interpolated DO data file, created by "02 - Temp and DO interpolation.Rmd"
-do = read.csv("../Compiled data/temp_o2_interpolated.csv")
+do <- read.csv("../Compiled data/temp_o2_interpolated.csv")
 ```
 
 
 Step 2: Summary statistics
 ```{r}
 #TN and DOC summary stats
-doc = p%>%
+doc <- p%>%
   filter(!is.na(DOC_mgL))%>%
   dplyr::summarise(n = length(unique(LakeID)))
 doc[1,1]
 
-tn = p%>%
+tn <- p%>%
   filter(!is.na(TN_ugL))%>%
   dplyr::summarise(n = length(unique(LakeID)))
 tn[1,1]
 
 #Merge P, DO, and lake info (from lat long file)
-full = p%>%
+full <- p%>%
   full_join(do, by = c("Date","LakeID", "Depth_m"))%>%
   full_join(lat_long, by = c("LakeID"))%>%
   mutate(Date = as.Date(Date))%>%
   filter(!is.na(MaximumDepth_m)&MaximumDepth_m>=6.4)
-
-
-#stats for the full dataset
-#filter to rows with data
-not_na = full%>%
-  filter(if_any(.cols = c(TP_ugL,DOC_mgL,Chla_ugL,Temp_C,DO_mgL,TN_ugL),
-                .fns = ~ !is.na(.x)))
-
-not_na%>%
-  dplyr::summarise(profiles = length(unique(paste0(Date,LakeID))),
-                   lakes = length(unique(LakeID)))
-
-not_na%>%
-  group_by(LakeID)%>%
-  dplyr::summarize(duration = as.numeric(max(Date)-min(Date))/365+1)%>%
-  ungroup()%>%
-  dplyr::summarize(min_duration = min(duration, na.rm = T),
-                   max_duration = max(duration, na.rm = T),
-                   sd_duration = sd(duration, na.rm = T),
-                   mean_duration = mean(duration, na.rm =T),
-                   median_duration = median(duration, na.rm = T))
-
-max(not_na$Date)
-
-lat_long%>%
-  ungroup()%>%
-  filter(LakeID %in% not_na$LakeID)%>%
-  dplyr::reframe(across(.cols = c(MaximumDepth_m,SurfaceArea_ha,Elevation_m,Latitude_DD),
-                          .fns = ~ c(median(.x,na.rm=T),min(.x,na.rm=T),max(.x,na.rm=T))))
-
-unique(lat_long$Country)
 ```
 
 
@@ -90,13 +59,13 @@ Step 3: Filter to stratified period
 ```{r}
 #Create a Date_22 column, so that I can filter to only the end of summer
 full$Date_22 <- full$Date
-year(full$Date_22)<-2022
+year(full$Date_22) <-2022
 
 #There are a few rows with missing dates because these lakes are in the lat long database and not do/p
 full%>%
   filter(is.na(as.Date(Date)))
 #Remove these NAs
-full = full%>%
+full <- full%>%
   filter(!is.na(Date),
          !is.na(Latitude_DD))
 
@@ -104,7 +73,7 @@ full = full%>%
 #Determine start and end of stratification, then thermo depths
 ###
 
-full_format = full%>%
+full_format <- full%>%
   mutate(Date_unif = as.Date(ifelse(Latitude_DD>=0,Date,Date+months(6)),origin = "1970-01-01"))%>%
   group_by(Date, Date_unif, LakeID, Depth_m)%>%
   dplyr::summarize(Temp_C = mean(Temp_C, na.rm = T))%>%
@@ -118,7 +87,7 @@ full_format = full%>%
   mutate(Year= year(Date_unif),
          unstrat = as.numeric(is.na(thermo)))
 #Start of stratification
-date_start = full_format%>%
+date_start <- full_format%>%
   group_by(Year,LakeID)%>%
   filter(unstrat==1,
          month(Date_unif)<=7)%>%
@@ -126,7 +95,7 @@ date_start = full_format%>%
   dplyr::select(Date, Year, LakeID)%>%
   rename(Date_start = Date)
 #End of stratification
-date_end = full_format%>%
+date_end <- full_format%>%
   group_by(Year,LakeID)%>%
   filter(unstrat==1,
          month(Date_unif)>7)%>%
@@ -134,11 +103,11 @@ date_end = full_format%>%
   dplyr::select(Date, Year, LakeID)%>%
   rename(Date_end = Date)
 #Stratification duration
-strat_dur = date_start%>%
+strat_dur <- date_start%>%
   full_join(date_end)
 
 #Filter to stratified period
-full_trimmed = full%>%
+full_trimmed <- full%>%
   mutate(Date_unif = as.Date(ifelse(Latitude_DD>=0,Date,Date+months(6)),origin = "1970-01-01"),
          Year = year(Date_unif))%>%
   full_join(strat_dur)%>%
@@ -152,7 +121,7 @@ full_trimmed = full%>%
 Step 4: Calculate metalimetic boundaries and average values within each layer
 ```{r}
 #Thermocline depths during stratified period
-thermo_depths = full_format%>%
+thermo_depths <- full_format%>%
   full_join(strat_dur)%>%
   filter(is.na(Date_start)|Date_unif>Date_start,
          is.na(Date_end)|Date_unif<Date_end)%>%
@@ -162,7 +131,7 @@ thermo_depths = full_format%>%
             count_unstrat = sum(unstrat),
             n= n())
 
-thermo_depths_sum = thermo_depths%>%
+thermo_depths_sum <- thermo_depths%>%
   group_by(LakeID)%>%
   dplyr::mutate(count_unstrat_tot = sum(count_unstrat),
                 n = sum(n))%>%
@@ -174,14 +143,14 @@ thermo_depths_sum = thermo_depths%>%
             hypo_sd = sd(hypo_depth, na.rm = T),
             hypo_depth = mean(hypo_depth, na.rm = T))
 
-full_with_thermo = full_trimmed%>%
+full_with_thermo <- full_trimmed%>%
   full_join(thermo_depths_sum)%>%
   filter(!is.na(epi_depth),
          !is.na(hypo_depth)
          )
 write.csv(full_with_thermo,"../Compiled data/Stratified_period_data_with_thermo.csv",row.names = F)
 
-summer_layers = full_with_thermo%>%
+summer_layers <- full_with_thermo%>%
   mutate(Layer = ifelse(!is.na(Depth_m)&Depth_m<epi_depth, "EPI", NA),
          Layer = ifelse(is.na(Depth_m)&!is.na(Interval)&Interval=="EPILIMNION","EPI",Layer),
          Layer = ifelse(!is.na(Depth_m)&Depth_m>hypo_depth,"HYPO",Layer),
@@ -190,7 +159,7 @@ summer_layers = full_with_thermo%>%
          Layer = ifelse(is.na(Depth_m)&!is.na(Interval)&Interval=="METALIMNION","META",Layer))%>%
   filter(!is.na(Layer))
 
-summer_avgs = summer_layers%>%
+summer_avgs <- summer_layers%>%
   group_by(LakeID,Year, Layer)%>%
   mutate(start_date = as.Date(paste0(Year,"-08-01")))%>%
   dplyr::summarize(TP_ugL = mean(TP_ugL, na.rm = T),
@@ -215,7 +184,7 @@ Step 5: Add buoyancy frequency, hypolimnetic SA:vol ratio, and chl-a during the 
 #Calculate buoyancy frequency
 ###
 
-buoyancy = full_trimmed%>%
+buoyancy <- full_trimmed%>%
   group_by(Date, LakeID, Depth_m)%>%
   dplyr::summarize(Temp_C = mean(Temp_C, na.rm = T))%>%
   filter(!is.na(Temp_C))%>%
@@ -226,7 +195,7 @@ buoyancy = full_trimmed%>%
   group_by(Year,LakeID)%>%
   dplyr::summarize(buoyancy_freq = mean(buoyancy_freq,na.rm=T))
 #Add to df
-summer_avgs = summer_avgs%>%
+summer_avgs <- summer_avgs%>%
   left_join(buoyancy)
 
 ###
@@ -241,35 +210,35 @@ lake_bats.raw <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029
   filter(methods_n==1|Method=="model")%>%
   ungroup()
 #Calculate ratio
-ratio = thermo_depths_sum%>%
+ratio <- thermo_depths_sum%>%
   mutate(Depth_m = round(hypo_depth))%>%
   dplyr::select(LakeID,Year,Depth_m)%>%
   left_join(lake_bats.raw, by = c("LakeID", "Depth_m"))%>%
   mutate(SA_vol_ratio = Area_m2/CumulativeVolume_m3)%>%
   dplyr::select(LakeID,Year,SA_vol_ratio)
 #Add to df
-summer_avgs = summer_avgs%>%
+summer_avgs <- summer_avgs%>%
   left_join(ratio)
 
 ###
 #Load published chl-a data
 ###
 
-chl = read.csv("../External data/ChlaData.csv") #https://knb.ecoinformatics.org/view/doi:10.5063/F1JH3JKZ
-lacking_data = summer_avgs%>%
+chl <- read.csv("../External data/ChlaData.csv") #https://knb.ecoinformatics.org/view/doi:10.5063/F1JH3JKZ
+lacking_data <- summer_avgs%>%
   group_by(LakeID)%>%
   summarize(n = sum(is.na(Chla_ugL)),
             tot = n())%>%
   filter(n==tot)
-name_harmonizer = read.csv("chla_harmonizer.csv") #Manually harmonized lake names
+name_harmonizer <- read.csv("chla_harmonizer.csv") #Manually harmonized lake names
 
-harm_short = name_harmonizer%>%
+harm_short <- name_harmonizer%>%
   filter(ID%in%lacking_data$LakeID)%>%
   filter(nchar(UniqueLakeName)>1)
 
 harm_short%>%filter(lat<0) #don't have to worry about southern hemisphere
 
-published_chla = chl%>%
+published_chla <- chl%>%
   mutate(Year = as.numeric(Year))%>%
   filter(UniqueLakeName%in%harm_short$UniqueLakeName)%>%
   filter(!is.na(Month),
@@ -281,11 +250,11 @@ published_chla = chl%>%
   dplyr::summarise(Chla_ugL = mean(ChlValues,na.rm = T)*1000)%>%
   mutate(Layer="EPI")
 
-published_chla = published_chla%>%
+published_chla <- published_chla%>%
   rename(Chla_ugL_published = Chla_ugL)
 
 #If we do not currently have any Chla data, add published data
-summer_avgs = summer_avgs%>%
+summer_avgs <- summer_avgs%>%
   full_join(published_chla)%>%
   mutate(Chla_ugL = ifelse(is.na(Chla_ugL),Chla_ugL_published,Chla_ugL))%>%
   dplyr::select(-Chla_ugL_published)
@@ -326,7 +295,7 @@ dev.off()
 
 Step 7: Plot data availability
 ```{r}
-data_for_plot = full%>%
+data_for_plot <- full%>%
   dplyr::select(Date,Depth_m,Temp_C, DO_mgL,LakeID, TP_ugL,Chla_ugL)%>%
   pivot_longer(cols = c(Temp_C, DO_mgL,TP_ugL,Chla_ugL))%>%
   group_by(LakeID,name)%>%
@@ -338,7 +307,7 @@ data_for_plot = full%>%
             tot = n())%>%
   pivot_longer(cols = c(tot,tot_ten), names_to = "var")
 
-layered_summary = summer_avgs%>%
+layered_summary <- summer_avgs%>%
   dplyr::select(Temp_C, DO_mgL,LakeID, TP_ugL,Chla_ugL,Layer,Year)%>%
   filter(!Layer == "META")%>%
   pivot_longer(cols = c(Temp_C, DO_mgL,TP_ugL,Chla_ugL))%>%
@@ -353,7 +322,7 @@ layered_summary = summer_avgs%>%
 
 library(viridis)
 jpeg("../Figures/data_availability_sum.jpg",width = 6, height = 2.5, units = "in", res = 300)
-all_data_plot = data_for_plot%>%
+all_data_plot <- data_for_plot%>%
   mutate(Layer = "All data")%>%
   full_join(layered_summary)%>%
   mutate(var = ifelse(var=="tot","Any data","≥10 years"),

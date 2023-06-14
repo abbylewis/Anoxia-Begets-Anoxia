@@ -8,51 +8,77 @@ output: html_document
 This code file performs basic characterization of the dataset and generates maps of lake study sites
 
 Table of contents:
-Step 1: Load packages and compiled data
-Step 2: Summarize data duration
+Step 1: Load packages
+Step 2: Summary statistics
 Step 3: Map distribution of lakes
 Step 4: Calculate n from each source
 
 
-Step 1: Load packages and compiled data
+Step 1: Load packages
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(viridis)
 library(lubridate)
-
-#Load saved data
-with_temp = read.csv("../Compiled data/All_data_annual.csv")
 ```
 
 
-Step 2: Summarize data duration
-NOTE this is for years with HYPO or EPI data of interest. Total duration stats for paper are from "03 Stratified avgs.Rmd"
+Step 2: Summary statistics
 ```{r}
-min(with_temp$Year)
-max(with_temp$Year)
+#Load data from EDI
+p <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/0ece9d7b67cd49741ed7ee60192832e4")
+lat_long <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/fadd3eaa25b5fdd1fc4efba70e660579")
+#Load interpolated DO data file, created by "02 - Temp and DO interpolation.Rmd"
+do <- read.csv("../Compiled data/temp_o2_interpolated.csv")
+#Combine
+full <- p%>%
+  full_join(do, by = c("Date","LakeID", "Depth_m"))%>%
+  full_join(lat_long, by = c("LakeID"))%>%
+  mutate(Date = as.Date(Date))%>%
+  filter(!is.na(MaximumDepth_m)&MaximumDepth_m>=6.4)
+#filter to rows with data
+not_na <- full%>%
+  filter(if_any(.cols = c(TP_ugL,DOC_mgL,Chla_ugL,Temp_C,DO_mgL,TN_ugL),
+                .fns = ~ !is.na(.x)))
+
 jpeg("../Figures/Data duration.jpg", width = 6, height = 4, res = 300, units = "in")
-with_temp%>%
+not_na%>%
+  mutate(Year = year(Date))%>%
+  dplyr::select(Year,LakeID)%>%
+  unique()%>%
   ggplot(aes(x = Year))+
   ylab("Number of lakes")+
   geom_histogram(binwidth=1)+
   theme_bw()
 dev.off()
 
-years = with_temp%>%
-  filter(!is.na(Temp_C_HYPO)|
-           !is.na(Temp_C_EPI)|
-           !is.na(DO_mgL_HYPO)|
-           !is.na(DO_mgL_EPI)|
-           !is.na(Chla_ugL_EPI)|
-           !is.na(TP_ugL_HYPO)|
-           !is.na(TP_ugL_EPI))%>%
+not_na%>%
+  dplyr::summarise(profiles = length(unique(paste0(Date,LakeID))),
+                   lakes = length(unique(LakeID)))
+
+not_na%>%
   group_by(LakeID)%>%
-  dplyr::summarise(n_year = length(unique(Year)))
-median(years$n_year)
-min(years$n_year)
-max(years$n_year)
-length(unique(with_temp$LakeID))
+  dplyr::summarize(duration = as.numeric(max(Date)-min(Date))/365+1)%>%
+  ungroup()%>%
+  dplyr::summarize(min_duration = min(duration, na.rm = T),
+                   max_duration = max(duration, na.rm = T),
+                   sd_duration = sd(duration, na.rm = T),
+                   mean_duration = mean(duration, na.rm =T),
+                   median_duration = median(duration, na.rm = T))
+
+min(not_na$Date)
+max(not_na$Date)
+
+lat_long%>%
+  ungroup()%>%
+  filter(LakeID %in% not_na$LakeID)%>%
+  dplyr::reframe(across(.cols = c(MaximumDepth_m,SurfaceArea_ha,Elevation_m,Latitude_DD),
+                          .fns = ~ c(median(.x,na.rm=T),min(.x,na.rm=T),max(.x,na.rm=T))))
+
+unique(lat_long$Country)
+
+#How many lakes are removed by 6.4 m depth cut off?
+length(unique(lat_long$LakeID))-length(unique(lat_long$LakeID[is.na(lat_long$MaximumDepth_m)|lat_long$MaximumDepth_m>6.4])) #158
 ```
 
 
@@ -71,7 +97,7 @@ world <- ne_countries(scale = "medium", returnclass = "sf")
 for_map <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/fadd3eaa25b5fdd1fc4efba70e660579")
 
 jpeg("../Figures/World Map - just points.jpg", res = 300, width = 6, height = 3.2, units = "in")
-world_map = ggplot(data = world) +
+world_map <- ggplot(data = world) +
   geom_sf() +
   coord_sf(expand = FALSE)+
   geom_point(data = for_map, aes(Longitude_DD, Latitude_DD), fill = "red",shape = 21, color = "white", size = 2, alpha  =.5, stroke = .4)+
@@ -91,7 +117,7 @@ jpeg("../Figures/US Map - just points.jpg", res = 300, width = 6, height = 3, un
 for_states <- for_map%>%
   filter(Country == "USA")
 states <- ne_states(returnclass = "sf",country = "United States of America")
-us_map = ggplot(data = states) +
+us_map <- ggplot(data = states) +
   geom_sf() +
   coord_sf(expand = FALSE, ylim = c(25, 50), xlim = c(-130,-60))+
   geom_point(data = for_states, aes(Longitude_DD, Latitude_DD), fill = "red",shape = 21, color = "white", size = 2.8, alpha  =.2, stroke = .4)+
@@ -108,7 +134,7 @@ us_map
 dev.off()
 
 jpeg("../Figures/Euro Map - just points.jpg", res = 300, width = 4, height = 4, units = "in")
-euro_map = ggplot(data = world) +
+euro_map <- ggplot(data = world) +
   geom_sf() +
   coord_sf(expand = FALSE, ylim = c(35, 70), xlim = c(-12,40))+
   geom_point(data = for_map, aes(Longitude_DD, Latitude_DD), fill = "red",shape = 21, color = "white", size = 2.8, alpha  =.5, stroke = .4)+
@@ -128,9 +154,9 @@ dev.off()
 
 Step 4: Calculate n from each source
 ```{r}
-lat_long = read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/fadd3eaa25b5fdd1fc4efba70e660579")
+lat_long <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/fadd3eaa25b5fdd1fc4efba70e660579")
 length(unique(lat_long$LakeID))
-strat = lat_long%>%
+strat <- lat_long%>%
   filter(MaximumDepth_m>=6.4)
 strat%>%
   filter(!is.na(as.numeric(LakeID)))

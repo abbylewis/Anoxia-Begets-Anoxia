@@ -50,7 +50,7 @@ mynetcdf_t <- '../External data/era5.nc' #Downloaded from here: https://cds.clim
 #The downloaded data is too large to store on github
 ncFile_t <- nc_open(mynetcdf_t)
 Lon <- ncvar_get(ncFile_t,"longitude")
-Lon = ifelse(Lon > 180, -(360 - Lon), Lon)
+Lon <- ifelse(Lon > 180, -(360 - Lon), Lon)
 Lat <- ncvar_get(ncFile_t,"latitude")
 time <- ncvar_get(ncFile_t,"time")
 t_mean <- ncvar_get(ncFile_t,"t2m")
@@ -58,11 +58,11 @@ fillvalue <- ncatt_get(ncFile_t, "t2m","missing_value")
 #If you get a vector memory error you may have to follow the steps here
 #https://stackoverflow.com/questions/51295402/r-on-macos-error-vector-memory-exhausted-limit-reached
 t_mean[t_mean == fillvalue$value] <- NA
-months = month(as.Date("1900-01-01")+hours(time))
-years = year(as.Date("1900-01-01")+hours(time))
+months <- month(as.Date("1900-01-01")+hours(time))
+years <- year(as.Date("1900-01-01")+hours(time))
 
 #Loop through lakes and add temp data based on lat/lon
-combined_t_df = data.frame(LakeID = rep(lakes_format$LakeID, each = length(months)),
+combined_t_df <- data.frame(LakeID = rep(lakes_format$LakeID, each = length(months)),
                            Month = rep(months,nrow(lakes_format)),
                            Year = rep(years,nrow(lakes_format)),
                            Temp_C = as.numeric(NA),
@@ -70,13 +70,13 @@ combined_t_df = data.frame(LakeID = rep(lakes_format$LakeID, each = length(month
                            Lat = as.numeric(NA)
                            )
 for(i in 1:nrow(lakes_format)){
-  lon_id = ifelse(min(abs(lakes_format[i,]$Lon-Lon))<=0.25,which.min(abs(lakes_format[i,]$Lon-Lon)),NA)
-  lat_id = ifelse(min(abs(lakes_format[i,]$Lat-Lat))<=0.25, which.min(abs(lakes_format[i,]$Lat-Lat)),NA)
+  lon_id <- ifelse(min(abs(lakes_format[i,]$Lon-Lon))<=0.25,which.min(abs(lakes_format[i,]$Lon-Lon)),NA)
+  lat_id <- ifelse(min(abs(lakes_format[i,]$Lat-Lat))<=0.25, which.min(abs(lakes_format[i,]$Lat-Lat)),NA)
   if(!is.na(lon_id)&!is.na(lat_id)){
-    t_vector1 = t_mean[lon_id,lat_id,1,] 
-    t_vector2 = t_mean[lon_id,lat_id,2,] 
-    t_vector = t_vector1
-    t_vector[is.na(t_vector)]=t_vector2[is.na(t_vector)]
+    t_vector1 <- t_mean[lon_id,lat_id,1,] 
+    t_vector2 <- t_mean[lon_id,lat_id,2,] 
+    t_vector <- t_vector1
+    t_vector[is.na(t_vector)] <- t_vector2[is.na(t_vector)]
     combined_t_df$Temp_C[combined_t_df$LakeID==lakes_format[i,]$LakeID]<- t_vector-273.15
     combined_t_df$Lon[combined_t_df$LakeID==lakes_format[i,]$LakeID]<- Lon[lon_id]
     combined_t_df$Lat[combined_t_df$LakeID==lakes_format[i,]$LakeID]<- Lat[lat_id]
@@ -92,7 +92,7 @@ write.csv(combined_t_df,"../External data/historical_temp_output_era5.csv", row.
 mynetcdf_p <- '../External data/era5_precip.nc' #Downloaded from here: https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-era5-single-levels-monthly-means?tab=form
 ncFile_p <- nc_open(mynetcdf_p)
 Lon <- ncvar_get(ncFile_p,"longitude")
-Lon = ifelse(Lon > 180, -(360 - Lon), Lon)
+Lon <- ifelse(Lon > 180, -(360 - Lon), Lon)
 Lat <- ncvar_get(ncFile_p,"latitude")
 time <- ncvar_get(ncFile_p,"time")
 p_mean <- ncvar_get(ncFile_p,"tp")
@@ -102,7 +102,7 @@ months = month(as.Date("1900-01-01")+hours(time))
 years = year(as.Date("1900-01-01")+hours(time))
 
 #Loop through lakes and add precip data based on lat/lon
-combined_p_df = data.frame(LakeID = rep(lakes_format$LakeID, each = length(months)),
+combined_p_df <- data.frame(LakeID = rep(lakes_format$LakeID, each = length(months)),
                            Month = rep(months,nrow(lakes_format)),
                            Year = rep(years,nrow(lakes_format)),
                            Total_Precip = as.numeric(NA),
@@ -110,13 +110,13 @@ combined_p_df = data.frame(LakeID = rep(lakes_format$LakeID, each = length(month
                            Lat = as.numeric(NA)
                            )
 for(i in 1:nrow(lakes_format)){
-  lon_id = ifelse(min(abs(lakes_format[i,]$Lon-Lon))<=0.25,which.min(abs(lakes_format[i,]$Lon-Lon)),NA)
-  lat_id = ifelse(min(abs(lakes_format[i,]$Lat-Lat))<=0.25, which.min(abs(lakes_format[i,]$Lat-Lat)),NA)
+  lon_id <- ifelse(min(abs(lakes_format[i,]$Lon-Lon))<=0.25,which.min(abs(lakes_format[i,]$Lon-Lon)),NA)
+  lat_id <- ifelse(min(abs(lakes_format[i,]$Lat-Lat))<=0.25, which.min(abs(lakes_format[i,]$Lat-Lat)),NA)
   if(!is.na(lon_id)&!is.na(lat_id)){
-    p_vector1 = p_mean[lon_id,lat_id,1,] 
-    p_vector2 = p_mean[lon_id,lat_id,2,] 
-    p_vector = p_vector1
-    p_vector[is.na(p_vector)]=p_vector2[is.na(p_vector)]
+    p_vector1 <- p_mean[lon_id,lat_id,1,] 
+    p_vector2 <- p_mean[lon_id,lat_id,2,] 
+    p_vector <- p_vector1
+    p_vector[is.na(p_vector)] <- p_vector2[is.na(p_vector)]
     combined_p_df$Total_Precip[combined_p_df$LakeID==lakes_format[i,]$LakeID]<- p_vector
     combined_p_df$Lon[combined_p_df$LakeID==lakes_format[i,]$LakeID]<- Lon[lon_id]
     combined_p_df$Lat[combined_p_df$LakeID==lakes_format[i,]$LakeID]<- Lat[lat_id]

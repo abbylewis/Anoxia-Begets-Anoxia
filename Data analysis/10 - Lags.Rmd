@@ -25,13 +25,13 @@ library(lubridate)
 set.seed(47) #Set seed so points jitter the same every time
 
 #Load saved data
-with_temp = read.csv("../Compiled data/All_data_annual.csv")
+with_temp <- read.csv("../Compiled data/All_data_annual.csv")
 ```
 
 
 Step 2: Hypo. DO vs. TP lag
 ```{r}
-p_do_stat = with_temp%>%
+p_do_stat <- with_temp%>%
   unique()%>%
   group_by(LakeID)%>%
   arrange(LakeID,Year)%>%
@@ -73,7 +73,7 @@ dev.off()
 
 Step 3: Hypo. TP vs epi. TP lag
 ```{r}
-p_p_stat = with_temp%>%
+p_p_stat <- with_temp%>%
   unique()%>%
   group_by(LakeID)%>%
   arrange(LakeID,Year)%>%
@@ -114,7 +114,7 @@ dev.off()
 
 Step 4: Epi. TP vs chl-a lag
 ```{r}
-p_chla_stat = with_temp%>%
+p_chla_stat <- with_temp%>%
   unique()%>%
   group_by(LakeID)%>%
   arrange(LakeID,Year)%>%
@@ -155,7 +155,7 @@ dev.off()
 
 Step 5: Chl-a vs VHOD lag
 ```{r}
-chla_demand_stat = with_temp%>%
+chla_demand_stat <- with_temp%>%
   unique()%>%
   group_by(LakeID)%>%
   arrange(LakeID,Year)%>%
@@ -202,7 +202,7 @@ dev.off()
 
 Step 6: VHOD vs hypo. DO lag
 ```{r}
-do_vhod_stat = with_temp%>%
+do_vhod_stat <- with_temp%>%
   unique()%>%
   group_by(LakeID)%>%
   arrange(LakeID,Year)%>%
