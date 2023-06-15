@@ -159,15 +159,17 @@ length(unique(lat_long$LakeID))
 strat <- lat_long%>%
   filter(MaximumDepth_m>=6.4)
 strat%>%
-  filter(!is.na(as.numeric(LakeID)))
+  filter(!is.na(as.numeric(LakeID))) #316
 strat%>%
-  filter(grepl("WI",LakeID))
+  filter(grepl("WI",LakeID)) #163
 strat%>%
   filter(grepl("NH",LakeID))
 strat%>%
   filter(grepl("MIDAS",LakeID))
 strat%>%
   filter(grepl("aba",LakeID))
+46-29 #46 ABA lakes, 29 of which are from GLEON, and 17 are from the U.S. Adirondack lakes database
+
 sum(lat_long$MaximumDepth_m<6.4,na.rm=T)
 
 #What percentage are temperate lakes located in the U.S.

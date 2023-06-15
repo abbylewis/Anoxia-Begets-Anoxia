@@ -196,7 +196,7 @@ if(POSTER){
 dataset%>%
   ggplot(aes(x = DO_demand_mgLd_HYPO,y=DO_mgL_HYPO,color=anoxic))+
   geom_point(alpha=0.2)+
-  geom_vline(xintercept = 0.09)+
+  geom_vline(xintercept = 0.1)+ #break_untrans
   theme_bw()+
   scale_color_manual(values = c("lightblue","red"), name = "Consistently anoxic")+
   xlab("Oxygen demand (mg/L/d)")+
@@ -261,7 +261,7 @@ aic_calculator_lmer(data_log_nuts,responses,potential_drivers, interaction = "+"
 selected_drivers <- c("DO_mgL_HYPO","strat_TP_ugL_EPI","winter_precip")
 std_data <-standardize_data(data_log_nuts,responses,selected_drivers)
 all_lakes_hypoP <- mod_by_lake(data_log_nuts,responses,selected_drivers, interaction = "+")
-mod_lmer <- lmer(TP_ugL_HYPO~DO_mgL_HYPO+strat_TP_ugL_EPI+winter_precip+(1|LakeID), data = std_data) 
+mod_lmer <- lmer(TP_ugL_HYPO~DO_mgL_HYPO+strat_TP_ugL_EPI+winter_precip+(1|LakeID), data = std_data)
 vif(mod_lmer)
 hypo_p <- plot_effects_lmer(mod_lmer,"Hypolimnetic TP (µg/L)", poster = POSTER) 
 hypo_p_ridge <- plot_effects_by_lake_lmer_ridge(all_lakes_hypoP,"Hypolimnetic TP (µg/L)",mod_lmer, poster = POSTER)
@@ -341,7 +341,7 @@ g2 <- ggplotGrob(
   epi_p   +theme(plot.title = element_text(size = 10),
                          plot.subtitle = element_text(size = 9),
                          axis.title.x = element_blank())+
-                   force_panelsizes(rows = unit(7*5/6, "cm")))
+                   force_panelsizes(rows = unit(6*5/6, "cm")))
 g3 <- ggplotGrob(
   epi_chla+theme(plot.title = element_text(size = 10),
                          plot.subtitle = element_text(size = 9))+
@@ -450,7 +450,7 @@ g2 <- ggplotGrob(epi_p_ridge
                  +theme(plot.title = element_text(size = 10),
                          plot.subtitle = element_text(size = 9),
                          axis.title.x = element_blank())+
-                   force_panelsizes(rows = unit(7, "cm")))
+                   force_panelsizes(rows = unit(6, "cm")))
 g3 <- ggplotGrob(epi_chla_ridge
                  #+ggtitle("Surface cholorphyll-a")
                  +theme(plot.title = element_text(size = 10),
@@ -478,16 +478,26 @@ layout <- rbind(c(1, 2),
                 c(1, 2),
                 c(1, 2),
                 c(1, 2),
+                c(1, 2),
+                c(1, 2),
+                c(1, 2),
                 c(3, 2),
                 c(3, 2),
                 c(3, 2),
                 c(3, 2),
+                c(3, 2),
+                c(3, 5),
+                c(3, 5),
                 c(4, 5),
                 c(4, 5),
                 c(4, 5),
                 c(4, 5),
                 c(4, 5),
-                c(4, 5))
+                c(4, 5),
+                c(4, 5),
+                c(4, 5),
+                c(4, 5),
+                c(4, NA))
 jpeg("../Figures/MLR-lmer/Parameter estimate-all-ridge.jpeg", width = 6, height = 6, res = 300, units = "in")
 grid.arrange(g1,g2,g3,g4,g5, layout_matrix=layout)
 dev.off()
@@ -702,8 +712,8 @@ potential_drivers <- c("log_MeanDepth_m",
                       "Elevation_m",
                       "mean_chla")
 responses <- c("chla_lag")
-responses <- c("Chla_ugL_EPI")#Nothing comes out cleanly
-#aic_calculator_onevar(for_mlr,responses,potential_drivers)
+#responses <- c("Chla_ugL_EPI")#Nothing comes out cleanly
+aic_calculator_onevar(for_mlr,responses,potential_drivers)
 summary(lm(chla_lag~log_Res_time, data = for_mlr))
 vhod <- for_mlr%>%
   filter(!is.na(chla_lag))%>%
@@ -715,16 +725,6 @@ vhod <- for_mlr%>%
   xlab("Residence time (d)")+
   geom_smooth(method = "lm",color = "black")+
   geom_point()
-
-jpeg("../Figures/Driver analysis.jpg", width = 7, height = 5, res = 300, units = "in")
-ggarrange(ggarrange(chla+stat_poly_eq(label.x = .1, label.y = 0.99),
-                    demand+stat_poly_eq(label.x = .8, data = .%>%filter(MaximumDepth_m<50)), 
-                    labels = c("A","B"), widths = c(1,1.3)),
-          ggarrange(vhod+stat_poly_eq(label.x = .1, label.y = 0.91),
-                    do+stat_compare_means(label.y.npc = 0.91),
-                    labels = c("C","D"), widths = c(1,1.3)), 
-          nrow = 2)
-dev.off()
 
 jpeg("../Figures/Driver analysis.jpg", width = 7, height = 5, res = 300, units = "in")
 ggarrange(ggarrange(chla+stat_poly_eq(label.x = .1, label.y = 0.99),
@@ -749,7 +749,7 @@ do_tp <- with_lags%>%
   filter(!is.na(TP_ugL_HYPO))%>%
   ungroup()%>%
   mutate(label = paste0("n = ",n()," lake-years\nn = ",length(unique(LakeID))," lakes"),
-         on_other_fig = ifelse(!is.na(TP_ugL_HYPO)&!is.na(depth_ratio_HYPO)&!is.na(DO_mgL_HYPO)&DO_mgL_HYPO<1.4&depth_ratio_HYPO<1,"y","n"))%>%
+         on_other_fig = ifelse(!is.na(TP_ugL_HYPO)&!is.na(depth_ratio_HYPO)&!is.na(DO_mgL_HYPO)&DO_mgL_HYPO<1.7&depth_ratio_HYPO<1,"y","n"))%>%
   ggplot()+
   scale_y_log10()+
   geom_point(aes(x = DO_mgL_HYPO,y=TP_ugL_HYPO,color = on_other_fig), alpha = 0.2)+
@@ -757,7 +757,7 @@ do_tp <- with_lags%>%
   xlab("Hypolimnetic DO (mg/L)")+
   ylab("Hypolimnetic TP (µg/L)")+
   scale_color_manual(values = c("black","blue"))+
-  geom_vline(xintercept = 1.4, color = "black")+
+  geom_vline(xintercept = 1.7, color = "black")+
   theme_bw()+
   theme(legend.position = "none")
 do_tp
@@ -768,7 +768,7 @@ depth_tp <- with_lags%>%
   filter(!is.na(TP_ugL_HYPO),
          !is.na(depth_ratio_HYPO),
          !is.na(DO_mgL_HYPO))%>%
-  filter(DO_mgL_HYPO<1.4,
+  filter(DO_mgL_HYPO<1.7,
          depth_ratio_HYPO<1)%>%
   ungroup()%>%
   mutate(label = paste0("n = ",n()," lake-years\nn = ",length(unique(LakeID))," lakes"))%>%
@@ -829,9 +829,9 @@ status_data <- with_temp%>%
   group_by(LakeID)%>%
   arrange(LakeID,Year)%>%
   filter(!is.na(DO_mgL_HYPO))%>%
-  filter(sum(DO_mgL_HYPO<1.4)>=1,
+  filter(sum(DO_mgL_HYPO<1.7)>=1,
          )%>%
-  mutate(anoxic_date = min(Year[DO_mgL_HYPO<1.4]),
+  mutate(anoxic_date = min(Year[DO_mgL_HYPO<1.7]),
          first_date = min(Year),
          end_date = max(Year),
          status = ifelse(Year>anoxic_date,"post-anoxia","pre-anoxia"),

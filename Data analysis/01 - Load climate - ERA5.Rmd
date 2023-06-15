@@ -82,7 +82,7 @@ for(i in 1:nrow(lakes_format)){
     combined_t_df$Lat[combined_t_df$LakeID==lakes_format[i,]$LakeID]<- Lat[lat_id]
   }
 }
-combined_t_df = combined_t_df%>%
+combined_t_df <- combined_t_df%>%
   mutate(Temp_C = trunc(Temp_C*100000)/100000)
 write.csv(combined_t_df,"../External data/historical_temp_output_era5.csv", row.names = F)
 
@@ -98,8 +98,8 @@ time <- ncvar_get(ncFile_p,"time")
 p_mean <- ncvar_get(ncFile_p,"tp")
 fillvalue <- ncatt_get(ncFile_p, "tp","missing_value")
 p_mean[p_mean == fillvalue$value] <- NA
-months = month(as.Date("1900-01-01")+hours(time))
-years = year(as.Date("1900-01-01")+hours(time))
+months <- month(as.Date("1900-01-01")+hours(time))
+years <- year(as.Date("1900-01-01")+hours(time))
 
 #Loop through lakes and add precip data based on lat/lon
 combined_p_df <- data.frame(LakeID = rep(lakes_format$LakeID, each = length(months)),
