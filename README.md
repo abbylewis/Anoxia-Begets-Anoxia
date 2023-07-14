@@ -45,6 +45,8 @@ All data analysis scripts:
     * Analyze the relevant lags for each relationship in the anoxia-begets-anoxia (ABA) feedback
 * 11 - Regressions.Rmd
     * Perform regression analyses within and across lakes to characterize the ABA feedback. Functions for this analysis are in "lmer_functions.R"
+* 12 - Depth cutoff of 3m.Rmd
+    * Re-run all analyses to generate Figure 3 using data from lakes ≥ 3 m, rather than ≥ 6.4 m
 
 ### ./External data
 

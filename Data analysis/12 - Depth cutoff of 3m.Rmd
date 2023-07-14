@@ -20,6 +20,13 @@ Step 10: Filter to late-summer period and calculate thermocline depths
 Step 11: Calculate average values within each layer
 Step 12: Add buoyancy frequency during the late-summer period
 Step 13: Calculate the percentage of the water column that is anoxic each year
+Step 14: Calculate the rate of change in volume-weighted oxygen concentrations during the stratified period at each lake (VHOD)
+Step 15: Calculate temperature-corrected oxygen demand values
+Step 16: Compile all in-lake data
+Step 17: Add climate data
+Step 18: Format data for regressions
+Step 19: Model selection
+Step 20: Generate combined figures
 
 Step 1: Load all packages
 ```{r setup, include=FALSE}
@@ -48,6 +55,7 @@ source("lmer_functions.R")
 POSTER = F #Set global option: Should figures be designed for a poster? Or for the manuscript
 set.seed(47) #Set seed so points jitter the same way each time
 ```
+
 
 Step 2: QAQC
 ```{r}
@@ -80,6 +88,7 @@ test_depth_removal <- to_profiles%>%
 to_profiles_depth_checked <- test_depth_removal%>%
   dplyr::select(LakeID,Date,Depth_m,Temp_C,DO_sat,DO_mgL,Flag_Temp_C,Flag_DO_mgL)
 ```
+
 
 Step 3: Interpolate DO, following Jane et al. (2021) - note that this will take a bit of time to run
 ```{r}
@@ -257,8 +266,6 @@ database.interp<-full_join(interpolatedvalues.t,interpolatedvalues.do,
 ## export
 write.csv(database.interp,"../Compiled data/temp_o2_interpolated_3m.csv")
 ```
-
-This file loads temp/DO/productivity data, calculates summary statistics for the dataset, and calculates mean concentrations of each focal variable during the summer stratified period. All code chunks must be run in order.
 
 
 Step 6: Load productivity data
@@ -649,7 +656,6 @@ areal <- tl_percent_anoxic_and_oxic  %>%
 
 write.csv(areal,"../Compiled data/anoxic_bathymetry_3m.csv", row.names = F)
 ```
-
 
 
 Step 14: Calculate the rate of change in volume-weighted oxygen concentrations during the stratified period at each lake (VHOD)
@@ -1057,7 +1063,7 @@ epi_chla_ridge <- plot_effects_by_lake_lmer_ridge(all_lakes_chla,"Epilimnetic ch
 ```
 
 
-Step 4: Generate combined figures
+Step 20: Generate combined figures
 ```{r}
 g1 <- ggplotGrob(
   hypo_p  +theme(plot.title = element_text(size = 10),
