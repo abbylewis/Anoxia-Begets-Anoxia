@@ -219,7 +219,7 @@ selected_drivers <- c("Chla_ugL_EPI","chla_lag","strat_buoyancy_freq_EPI")
 std_data <-standardize_data(data_log_chla,responses,selected_drivers)
 all_lakes_vhod5 <- mod_by_lake(data_log_chla,responses,selected_drivers, interaction = "+")
 mod_lmer <- lmer(VHOD5_mgLd_HYPO~Chla_ugL_EPI+chla_lag+strat_buoyancy_freq_EPI+(1|LakeID), data = std_data) 
-#No need to run VIF here because there is only one driver
+vif(mod_lmer)
 confint(mod_lmer)
 summary(mod_lmer)
 plot_effects_lmer(mod_lmer,"Temperature-corrected oxygen demand") 
@@ -517,8 +517,8 @@ incomplete <- all_lakes_chla%>%
   full_join(all_lakes_vhod%>%
               dplyr::select(chla_lag,Chla_ugL_EPI,LakeID))
 
-hydro <- read.csv("../External data/hydrolakes_full.csv")
-lat_long <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/fadd3eaa25b5fdd1fc4efba70e660579")
+hydro <- read.csv("../Compiled data/hydrolakes_full.csv")
+lat_long <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/fadd3eaa25b5fdd1fc4efba70e660579")
 
 means <- with_temp%>%
   group_by(LakeID)%>%
@@ -602,17 +602,25 @@ responses <- c("strat_TP_ugL_EPI")
 aic_calculator_onevar(for_mlr,responses,potential_drivers)
 summary(lm(strat_TP_ugL_EPI~log_epiP, data = for_mlr)) #Take home: epi P has a positive relationship
 
+p_value = summary(lm(strat_TP_ugL_EPI~log_epiP, data = for_mlr))$coefficients[,4][2]
+if(p_value < 0.001){p_value_text = "< 0.001"}else{p_value_text = paste0("= ",as.character(p_value))}
+r2_value = summary(lm(strat_TP_ugL_EPI~log_epiP, data = for_mlr))$r.squared
+r2_value_text = round(r2_value,2)
+
 jpeg("../Figures/Effect of TP on chl-a.jpg", width = 4, height = 4, res = 300, units = "in")
 chla <- for_mlr%>%
   filter(!is.na(strat_TP_ugL_EPI))%>%
   ggplot(aes(x=mean_epi_p,y=strat_TP_ugL_EPI))+
-  geom_point()+
+  geom_smooth(method = "lm", color = "black")+
+  geom_point(color = "grey20")+
   scale_x_log10()+
   geom_hline(yintercept = 0)+
-  geom_smooth(method = "lm", color = "black")+
   theme_bw()+
   ylab("Coefficient for the\neffect of epi. TP on chl-a")+
-  xlab("Mean epilimnetic TP (µg/L)")
+  xlab("Mean epilimnetic TP (µg/L)")+
+  annotate("text",x = 8, y = 0.87,
+           label = paste0("R^2 == ",r2_value_text,"~~~p ", p_value_text), 
+           parse = TRUE)
 chla
 dev.off()
 
@@ -624,10 +632,10 @@ for_mlr%>%
          ratio = ifelse(is.na(ratio),"Insufficient data",ratio),
          ratio = factor(ratio,levels = c("N limited (TN:TP < 12)","Co-limited","P limited (TN:TP > 44)","Insufficient data")))%>%
   ggplot(aes(x=mean_epi_p,y=strat_TP_ugL_EPI, color = ratio))+
+  geom_smooth(method = "lm", color = "black")+
   geom_point()+
   scale_x_log10()+
   geom_hline(yintercept = 0)+
-  geom_smooth(method = "lm", color = "black")+
   theme_bw()+
   theme(legend.title = element_blank())+
   ylab("Coefficient for the\neffect of epi. TP on chl-a")+
@@ -688,20 +696,28 @@ responses <- c("DO_demand_mgLd_HYPO")
 aic_calculator_onevar(for_mlr,responses,potential_drivers)
 summary(lm(DO_demand_mgLd_HYPO~log_SurfaceArea_ha, data = for_mlr)) #Take home: surface area is most important
 
+p_value = summary(lm(DO_demand_mgLd_HYPO~log_SurfaceArea_ha, data = for_mlr%>%filter(MaximumDepth_m<50)))$coefficients[,4][2]
+if(p_value < 0.001){p_value_text = "< 0.001"}else{p_value_text = paste0("== ",as.character(round(p_value,3)))}
+r2_value = summary(lm(DO_demand_mgLd_HYPO~log_SurfaceArea_ha, data = for_mlr%>%filter(MaximumDepth_m<50)))$r.squared
+r2_value_text = round(r2_value,2)
+
 jpeg("../Figures/Effect of VHOD on DO.jpg", width = 4, height = 4, res = 300, units = "in")
 demand <- for_mlr%>%
   filter(!is.na(DO_demand_mgLd_HYPO),
          !is.na(SurfaceArea_ha))%>%
   ggplot(aes(x=SurfaceArea_ha,y=DO_demand_mgLd_HYPO))+
+  geom_smooth(method = "lm", color = "black", data = .%>%filter(MaximumDepth_m<50))+
   geom_point(aes(color = MaximumDepth_m, shape = MaximumDepth_m>50))+
   scale_x_log10()+
   geom_hline(yintercept = 0)+
-  geom_smooth(method = "lm", color = "black", data = .%>%filter(MaximumDepth_m<50))+
   theme_bw()+
   scale_color_viridis_c(trans = "log", breaks = c(25,50,100,200), name = "Maximum\ndepth (m)")+
   ylab("Coefficient for the\neffect of VHOD on DO")+
   xlab("Surface area (ha)")+
-  guides(shape = "none") 
+  guides(shape = "none") +
+  annotate("text",x = 5000, y = 0.73,
+           label = paste0("R^2 == ",r2_value_text,"~~~p ", p_value_text), 
+           parse = TRUE)
 demand
 dev.off()
 
@@ -715,6 +731,12 @@ responses <- c("chla_lag")
 #responses <- c("Chla_ugL_EPI")#Nothing comes out cleanly
 aic_calculator_onevar(for_mlr,responses,potential_drivers)
 summary(lm(chla_lag~log_Res_time, data = for_mlr))
+
+p_value = summary(lm(chla_lag~log_Res_time, data = for_mlr))$coefficients[,4][2]
+if(p_value < 0.001){p_value_text = "< 0.001"}else{p_value_text = paste0("== ",as.character(round(p_value,3)))}
+r2_value = summary(lm(chla_lag~log_Res_time, data = for_mlr))$r.squared
+r2_value_text = round(r2_value,2)
+
 vhod <- for_mlr%>%
   filter(!is.na(chla_lag))%>%
   ggplot(aes(x = Res_time,y=chla_lag))+
@@ -724,14 +746,17 @@ vhod <- for_mlr%>%
   ylab("Coefficient for the\neffect of chl-a (t-1) on VHOD")+
   xlab("Residence time (d)")+
   geom_smooth(method = "lm",color = "black")+
-  geom_point()
+  geom_point(color = "grey20")+
+  annotate("text",x = 250, y = 0.73,
+           label = paste0("R^2 == ",r2_value_text,"~~~p ", p_value_text), 
+           parse = TRUE)
 
 jpeg("../Figures/Driver analysis.jpg", width = 7, height = 5, res = 300, units = "in")
-ggarrange(ggarrange(chla+stat_poly_eq(label.x = .1, label.y = 0.99),
-                    vhod+stat_poly_eq(label.x = .1, label.y = 0.91),
+ggarrange(ggarrange(chla,
+                    vhod,
                     labels = c("A","B"),
                     label.x = -0.01),
-          ggarrange(demand+stat_poly_eq(label.x = .8, data = .%>%filter(MaximumDepth_m<50)),
+          ggarrange(demand,
                     ggplot()+geom_blank()+theme_minimal(),
                     labels = c("C", NA),
                     label.x = -0.005,
@@ -762,6 +787,16 @@ do_tp <- with_lags%>%
   theme(legend.position = "none")
 do_tp
 dev.off()
+
+depth_tp_reg <- with_lags%>%
+  filter(!is.na(TP_ugL_HYPO),
+         !is.na(depth_ratio_HYPO),
+         !is.na(DO_mgL_HYPO))%>%
+  filter(DO_mgL_HYPO<1.7,
+         depth_ratio_HYPO<1)%>%
+  mutate(log_TP_ugL_HYPO = log10(TP_ugL_HYPO))%>%
+  ungroup()
+summary(lm(log_TP_ugL_HYPO~depth_ratio_HYPO, data = depth_tp_reg))
 
 jpeg("../Figures/Depth TP.jpeg", width = 3, height = 3, res = 300, units = "in")
 depth_tp <- with_lags%>%

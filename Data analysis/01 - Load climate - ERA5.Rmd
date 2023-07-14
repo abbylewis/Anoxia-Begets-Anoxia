@@ -37,7 +37,7 @@ library(lubridate)
 Step 2: Load and synthesize data
 ```{r}
 #Read and format our lake metadata
-lakes <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/fadd3eaa25b5fdd1fc4efba70e660579") 
+lakes <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/fadd3eaa25b5fdd1fc4efba70e660579") 
 lakes_format <- lakes %>%
   dplyr::select(LakeID,Longitude_DD,Latitude_DD) %>%
   rename(Lon=Longitude_DD,Lat=Latitude_DD)%>%
@@ -84,7 +84,7 @@ for(i in 1:nrow(lakes_format)){
 }
 combined_t_df <- combined_t_df%>%
   mutate(Temp_C = trunc(Temp_C*100000)/100000)
-write.csv(combined_t_df,"../External data/historical_temp_output_era5.csv", row.names = F)
+write.csv(combined_t_df,"../Compiled data/historical_temp_output_era5.csv", row.names = F)
 
 
 #  Precipitation
@@ -122,5 +122,5 @@ for(i in 1:nrow(lakes_format)){
     combined_p_df$Lat[combined_p_df$LakeID==lakes_format[i,]$LakeID]<- Lat[lat_id]
   }
 }
-write.csv(combined_p_df,"../External data/historical_precip_output_era5.csv", row.names = F)
+write.csv(combined_p_df,"../Compiled data/historical_precip_output_era5.csv", row.names = F)
 ```

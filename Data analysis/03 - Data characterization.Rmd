@@ -26,8 +26,8 @@ library(lubridate)
 Step 2: Summary statistics
 ```{r}
 #Load data from EDI
-p <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/0ece9d7b67cd49741ed7ee60192832e4")
-lat_long <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/fadd3eaa25b5fdd1fc4efba70e660579")
+p <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/0ece9d7b67cd49741ed7ee60192832e4")
+lat_long <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/fadd3eaa25b5fdd1fc4efba70e660579")
 #Load interpolated DO data file, created by "02 - Temp and DO interpolation.Rmd"
 do <- read.csv("../Compiled data/temp_o2_interpolated.csv")
 #Combine
@@ -94,7 +94,7 @@ library(ggspatial)
 
 #Create a world map of the sites in this analysis
 world <- ne_countries(scale = "medium", returnclass = "sf")
-for_map <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/fadd3eaa25b5fdd1fc4efba70e660579")
+for_map <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/fadd3eaa25b5fdd1fc4efba70e660579")
 
 jpeg("../Figures/World Map - just points.jpg", res = 300, width = 6, height = 3.2, units = "in")
 world_map <- ggplot(data = world) +
@@ -154,7 +154,7 @@ dev.off()
 
 Step 4: Calculate n from each source
 ```{r}
-lat_long <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/fadd3eaa25b5fdd1fc4efba70e660579")
+lat_long <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/fadd3eaa25b5fdd1fc4efba70e660579")
 length(unique(lat_long$LakeID))
 strat <- lat_long%>%
   filter(MaximumDepth_m>=6.4)

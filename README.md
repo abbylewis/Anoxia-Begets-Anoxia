@@ -8,13 +8,13 @@ An analysis of oxygen, phosphorus, and chlorophyll-a dynamics across >650 widesp
 
 ## Keywords
 
-Chlorophyll-a, dissolved oxygen, phosphorus, spring air temperature
+Air temperature, anoxia, chlorophyll-a, dissolved oxygen, feedback, hypolimnion, oxygen demand, phosphorus, residence time, surface area
 
 ## Data availability
 
 * In-lake data for this study published on the Environmental Data Initative data portal: https://portal-s.edirepository.org/nis/mapbrowse?scope=edi&identifier=1029&revision=7
 * Additional data are presented in ./External data:
-    * Air temperature and climate data are drawn from the ERA5 climate reanalysis. ERA5 is a fifth-generation product from the European Centre for Medium-Range Weather Forecasts (ECMWF), and provides data from 1959–2022 on a 0.5 degree global grid (Hersbach et al., 2019)
+    * Air temperature and climate data are drawn from the ERA5 climate reanalysis. ERA5 is a fifth-generation product from the European Centre for Medium-Range Weather Forecasts (ECMWF), and provides data from 1959–2022 on a 0.25 degree global grid (Hersbach et al., 2019)
     * Chlorophyll-a data from Filazzola et al. (2020) were added for n = 15 lakes without other data for chlorophyll-a
     *  We collated additional metadata for each lake using HydroLAKES, a global database of 1.4 million lakes (with surface area ≥10 ha; Messager et al., 2016)
 

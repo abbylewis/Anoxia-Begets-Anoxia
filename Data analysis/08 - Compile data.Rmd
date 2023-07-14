@@ -27,8 +27,8 @@ Step 2: Compile all in-lake data
 ```{r}
 do_demand_points <- read.csv("../Compiled data/VW oxygen demand points.csv")
 vhod5_points <- read.csv("../Compiled data/VHOD5 points.csv")
-lat_long <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/fadd3eaa25b5fdd1fc4efba70e660579")
-shape <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/fadd3eaa25b5fdd1fc4efba70e660579")%>%
+lat_long <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/fadd3eaa25b5fdd1fc4efba70e660579")
+shape <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/fadd3eaa25b5fdd1fc4efba70e660579")%>%
   filter(!is.na(MeanDepth_m),
          !is.na(MaximumDepth_m))%>%
   mutate(VD = 3*MeanDepth_m/MaximumDepth_m)%>%
@@ -80,7 +80,7 @@ length(unique(tn$LakeID))
 Step 3: Add climate data
 ```{r}
 #Temperature
-climate <- read.csv("../External data/historical_temp_output_era5.csv")
+climate <- read.csv("../Compiled data/historical_temp_output_era5.csv")
 climate_sum <- climate%>%
   mutate(Month = ifelse(Lat<0,Month+6,Month),
          Year = ifelse(Month>12,Year+1,Year),
@@ -105,7 +105,7 @@ climate_sum <- climate%>%
             Lon = unique(Lon))
 
 #Precipitation
-precip <- read.csv("../External data/historical_precip_output_era5.csv")
+precip <- read.csv("../Compiled data/historical_precip_output_era5.csv")
 precip_sum <- precip%>%
   mutate(Month = ifelse(Lat<0,Month+6,Month),
          Year = ifelse(Month>12,Year+1,Year),

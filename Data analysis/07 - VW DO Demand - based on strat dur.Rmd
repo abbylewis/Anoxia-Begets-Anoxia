@@ -23,10 +23,10 @@ library(rLakeAnalyzer)
 library(openair)
 
 #Load data and stratification boundaries. This file is created by "03 - Stratified avgs.Rmd"
-full_with_thermo = read.csv("../Compiled data/Stratified_period_data_with_thermo.csv")%>%
+full_with_thermo <- read.csv("../Compiled data/Stratified_period_data_with_thermo.csv")%>%
   mutate(Date=as.Date(Date))
 #Load lake metadata
-lat_long = read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/fadd3eaa25b5fdd1fc4efba70e660579")
+lat_long <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/fadd3eaa25b5fdd1fc4efba70e660579")
 ```
 
 
@@ -34,7 +34,7 @@ Step 2: Calculate the rate of change in volume-weighted oxygen concentrations du
 ```{r}
 #prepare bathymetry
 #lake with only one method (data/model)
-lake_bats <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/6/6af06151bb8785235ec1b55ded19e42c")%>%
+lake_bats <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/ba733454c29a5f026efed05a6e6ef75b")%>%
   filter(Area_m2>0)%>%
   group_by(LakeID)%>%
   mutate(methods_n = length(unique(Method)))%>%
