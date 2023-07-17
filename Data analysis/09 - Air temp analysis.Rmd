@@ -109,6 +109,7 @@ many_lake_stat <- many_lake_temp_sum%>%
 labs = c("N:     Sep\nS:     Mar","Oct\nApr","Nov\nMay","Dec\nJun","Jan\nJul","Feb\nAug","Mar\nSep","Apr\nOct","May\nNov","Jun\nDec","Jul\nJan","Aug\nFeb")
 
 anova_res <- aov(do_temp~as.factor(mon),data=many_lake_stat)
+length(unique(many_lake_stat$LakeID))
 summary(anova_res)
 tukey <- TukeyHSD(anova_res)
 cld <- multcompLetters4(anova_res,tukey)$`as.factor(mon)`$Letters
@@ -153,6 +154,7 @@ many_lake_stat <- many_lake_temp_sum%>%
             )
 anova_res <- aov(temp_temp~as.factor(mon),data=many_lake_stat)
 summary(anova_res)
+length(unique(many_lake_stat$LakeID))
 tukey <- TukeyHSD(anova_res)
 cld <- multcompLetters4(anova_res,tukey)$`as.factor(mon)`$Letters
 cld_df <- data.frame(cld = cld, mon = names(cld))%>%
@@ -200,6 +202,7 @@ many_lake_stat <- many_lake_temp_sum%>%
             )
 anova_res <- aov(temp_demand~as.factor(mon),data=many_lake_stat)
 summary(anova_res)
+length(unique(many_lake_stat$LakeID))
 tukey <- TukeyHSD(anova_res)
 cld <- multcompLetters4(anova_res,tukey)$`as.factor(mon)`$Letters
 cld_df <- data.frame(cld = cld, mon = names(cld))%>%
