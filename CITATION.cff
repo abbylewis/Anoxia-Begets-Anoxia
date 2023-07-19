@@ -13,5 +13,5 @@ date-released: 2023-07-17
 identifiers:
   - type: doi
     value: 10.5281/zenodo.8155128
-repository-code: https://github.com/abbylewis/Anoxia-Begets-Anoxia
+repository-code: "https://github.com/abbylewis/Anoxia-Begets-Anoxia"
 license: MIT
