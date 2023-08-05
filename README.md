@@ -13,7 +13,7 @@ Air temperature, anoxia, chlorophyll-a, dissolved oxygen, feedback, hypolimnion,
 ## Data availability
 
 * In-lake data for this study published on the Environmental Data Initative data portal: https://portal-s.edirepository.org/nis/mapbrowse?scope=edi&identifier=1029&revision=9
-* Additional data are presented in ./External data:
+* Additional data are presented in `./External data`:
     * Air temperature and climate data are drawn from the ERA5 climate reanalysis. ERA5 is a fifth-generation product from the European Centre for Medium-Range Weather Forecasts (ECMWF), and provides data from 1959–2022 on a 0.25 degree global grid (Hersbach et al., 2019)
     * Chlorophyll-a data from Filazzola et al. (2020) were added for n = 15 lakes without other data for chlorophyll-a
     *  We collated additional metadata for each lake using HydroLAKES, a global database of 1.4 million lakes (with surface area ≥10 ha; Messager et al., 2016)
@@ -23,29 +23,29 @@ Air temperature, anoxia, chlorophyll-a, dissolved oxygen, feedback, hypolimnion,
 ### ./Data analysis
 
 All data analysis scripts:
-* 01 - Load climate - ERA5.Rmd
+* `01 - Load climate - ERA5.Rmd`
     * Load netcdf of global climate data and output a csv with air temperature records at each lake
-* 02 - Temp and DO interpolation.Rmd
+* `02 - Temp and DO interpolation.Rmd`
     * Interpolate temperature and oxygen profiles to a 1 m depth resolution
-* 03 - Stratified avgs.Rmd
+* `03 - Stratified avgs.Rmd`
     * Calculate epilimnetic and hypolimnetic means during the stratified period of each year. Add in additional chlorophyll-a data using "chla_harmonizer.csv"
-* 04 - Summer avgs.Rmd
+* `04 - Summer avgs.Rmd`
     * Calculate epilimnetic and hypolimnetic means during the late-summer period of each year
-* 05 - hydrolakes.Rmd
+* `05 - hydrolakes.Rmd`
     * Load all hydrolakes data and output a csv with hydrolakes metadata for each lake
-* 06 - VW DO Demand - based on strat dur.Rmd
+* `06 - VW DO Demand - based on strat dur.Rmd`
     * Calculate volume-weighted hypolimnetic oxygen demand for each lake-year
-* 07 - Compile data.Rmd
+* `07 - Compile data.Rmd`
     * Combine late-summer and stratified means with oxygen demand, and climate data. Output a file for following analyses.
-* 08 - Data characterization.Rmd
+* `08 - Data characterization.Rmd`
     * Characterize the full, synthesized dataset. Output summary figures
-* 09 - Air temp analysis.Rmd
+* `09 - Air temp analysis.Rmd`
     * Analyze the effects of changing monthly air temperatures on hypolimnetic temperature and oxygen dynamics
-* 10 - Lags.Rmd
+* `10 - Lags.Rmd`
     * Analyze the relevant lags for each relationship in the anoxia-begets-anoxia (ABA) feedback
-* 11 - Regressions.Rmd
-    * Perform regression analyses within and across lakes to characterize the ABA feedback. Functions for this analysis are in "lmer_functions.R"
-* 12 - Depth cutoff of 3m.Rmd
+* `11 - Regressions.Rmd`
+    * Perform regression analyses within and across lakes to characterize the ABA feedback. Functions for this analysis are in `lmer_functions.R`
+* `12 - Depth cutoff of 3m.Rmd`
     * Re-run all analyses to generate Figure 3 using data from lakes ≥ 3 m, rather than ≥ 6.4 m
 
 ### ./External data
@@ -54,11 +54,11 @@ Downloaded data (unmodified from original sources)
 
 ### ./Compiled data
 
-Compiled datasets, created by the scripts in "./Data analysis"
+Compiled datasets, created by the scripts in `./Data analysis`
 
 ### ./Figures
 
-Figures created by the scripts in "./Data analysis"
+Figures created by the scripts in `./Data analysis`
 
 ### ./Illustrator files
 
