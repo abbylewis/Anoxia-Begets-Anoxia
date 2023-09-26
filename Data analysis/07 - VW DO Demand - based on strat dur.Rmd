@@ -33,12 +33,11 @@ lat_long <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/fa
 Step 2: Calculate the rate of change in volume-weighted oxygen concentrations during the stratified period at each lake (VHOD)
 ```{r}
 #prepare bathymetry
-#lake with only one method (data/model)
 lake_bats <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/ba733454c29a5f026efed05a6e6ef75b")%>%
   filter(Area_m2>0)%>%
   group_by(LakeID)%>%
   mutate(methods_n = length(unique(Method)))%>%
-  filter(methods_n==1|Method=="model")%>%
+  filter(methods_n==1|Method=="data")%>%
   ungroup()
 
 #Check bathymetric data availability
