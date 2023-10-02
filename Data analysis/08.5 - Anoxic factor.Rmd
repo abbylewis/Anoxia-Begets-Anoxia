@@ -5,7 +5,7 @@ date: "2022-08-29"
 output: html_document
 ---
 
-This file ___
+This file calculates anoxic factor for each lake year. 
 
 
 Step 1: Load data and packages
@@ -270,10 +270,10 @@ summer_af <- summer %>%
   select(LakeID, Year, AF_summer)
   
 AF_output <- AF %>%
-  select(LakeID, Year, AF) %>%
+  dplyr::select(LakeID, Year, AF) %>%
   full_join(summer_af) %>%
   mutate(AF = ifelse(is.na(AF), AF_summer, AF)) %>%
-  select(-AF_summer) %>%
+  dplyr::select(LakeID, Year, AF) %>%
   filter(!is.na(AF))
 
 unique(AF_output$LakeID)

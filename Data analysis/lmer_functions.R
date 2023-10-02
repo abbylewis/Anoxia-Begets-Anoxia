@@ -115,6 +115,7 @@ renamer_poster = function(text_vect){
     if(text=="DO_mgL_HYPO")        output[i]="Bottom water oxygen"
     if(text=="TN_ugL_EPI")         output[i]="Surface nitrogen"
     if(text=="DO_date_HYPO")       output[i]="Oxygen measurement\ndate (lake-year mean)"
+    if(text=="AF")                 output[i]="Anoxic factor"
     i = i+1
   }
   return(output)
