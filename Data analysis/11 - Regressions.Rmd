@@ -34,7 +34,7 @@ library(tidyverse)
 library(lubridate)
 source("lmer_functions.R")
 
-POSTER = F #Set global option: Should figures be designed for a poster? Or for the manuscript
+POSTER = F #Set global option: Should figures be designed for a poster or for the manuscript?
 
 set.seed(47) #Set seed so points jitter the same way each time
 
@@ -53,6 +53,7 @@ cummean.na <- function(x, na.rm = T) {
   return(op)
 }
 
+#Add relevant lags and seasonal calculations
 with_lags <- with_temp%>%
   unique()%>%
   group_by(LakeID)%>%
@@ -73,12 +74,9 @@ with_lags <- with_temp%>%
          lag_is_last_year = ifelse(lag(Year)==(Year-1),T,F))%>%
   filter(lag_is_last_year)
 
+# Save this as the dataset we will work with
 dataset <- with_lags
 row.names(dataset) <- paste(dataset$LakeID, dataset$Year)
-
-data_log_chla <- dataset%>%
-  mutate(Chla_ugL_EPI=log(Chla_ugL_EPI),
-         chla_lag = log(chla_lag))
 
 data_log_nuts <- dataset%>%
   mutate(Chla_ugL_EPI=log(Chla_ugL_EPI),
@@ -95,20 +93,13 @@ data_log_nuts <- dataset%>%
          epi_n_lag = log(epi_n_lag),
          hypo_n_lag = log(hypo_n_lag)) #produces NAs because of two EPI TN == 0
 
+#Create datasets that are only oxic or only anoxic lakes
 data_no_anoxic <- dataset%>%
   filter(anoxic==F)
 
-dataset%>%
-  group_by(anoxic)%>%
-  dplyr::summarize(anoxic = length(unique(LakeID)))
-
-data_log_chla_no_anoxic <- dataset%>%
-  mutate(Chla_ugL_EPI=log(Chla_ugL_EPI),
-         chla_lag = log(chla_lag))%>%
-  filter(anoxic==F)
-
-data_log_nuts_no_anoxic <- data_log_nuts%>%
-  filter(anoxic==F)
+data_always_oxic <- dataset %>%
+  filter(!is.finite(max(AF, na.rm = T)) || max(AF, na.rm = T) == 0,
+         !is.finite(min(DO_mgL_HYPO, na.rm = T)) || min(DO_mgL_HYPO, na.rm = T) > 1.7)
 
 data_no_oxic <- dataset %>%
   filter(max(AF, na.rm = T) > 0)
@@ -125,16 +116,17 @@ potential_drivers <- c("Chla_ugL_EPI",
                       "SA_vol_ratio_HYPO",
                       "strat_buoyancy_freq_EPI" #all layers are the same
                       )
-aic_calculator_lmer(data_log_chla,responses,potential_drivers, interaction = "+")
+aic_calculator_lmer(data_log_nuts,responses,potential_drivers, interaction = "+")
 selected_drivers <- c("Chla_ugL_EPI","chla_lag","strat_Temp_C_HYPO","SA_vol_ratio_HYPO")
-std_data <- standardize_data(data_log_chla,responses,selected_drivers)
-all_lakes_vhod <- mod_by_lake(data_log_chla,responses,selected_drivers, interaction = "+")
+std_data <- standardize_data(data_log_nuts,responses,selected_drivers)
+all_lakes_vhod <- mod_by_lake(data_log_nuts,responses,selected_drivers, interaction = "+")
 mod_lmer <- lmer(DO_demand_mgLd_HYPO~Chla_ugL_EPI+chla_lag+strat_Temp_C_HYPO+SA_vol_ratio_HYPO+(1|LakeID), data = std_data)
+mod_lmer
 vif(mod_lmer)
 vhod <- plot_effects_lmer(mod_lmer,"Oxygen demand (mg/L/d)", poster = POSTER)
 vhod_ridge <- plot_effects_by_lake_lmer_ridge(all_lakes_vhod,var_name = "Oxygen demand (mg/L/d)",mod_lmer, poster = POSTER)
 
-###
+### DO (rather than anoxic factor)
 responses <- c("DO_mgL_HYPO")
 potential_drivers <- c("DO_demand_mgLd_HYPO",
                       "spring_temp",
@@ -208,8 +200,8 @@ dataset%>%
 ggsave(paste0("../Figures/DO_VHOD.jpeg"),
        width = 4, height = 4, units = "in")
 
-###
-responses <- c("AF")
+### DO (only oxic lakes)
+responses <- c("DO_mgL_HYPO")
 potential_drivers <- c("DO_demand_mgLd_HYPO",
                       "spring_temp",
                       "summer_temp",
@@ -217,11 +209,30 @@ potential_drivers <- c("DO_demand_mgLd_HYPO",
                       "Temp_C_HYPO",
                       "DO_date_HYPO"
                       )
-aic_calculator_lmer(data_no_oxic,responses,potential_drivers, interaction = "+")
+aic_calculator_lmer(data_always_oxic,responses,potential_drivers, interaction = "+")
+selected_drivers <- c("DO_demand_mgLd_HYPO", "spring_temp", "winter_temp", "DO_date_HYPO")
+std_data <- standardize_data(data_no_anoxic,responses,selected_drivers)
+all_lakes_do <- mod_by_lake(data_no_anoxic,responses,selected_drivers, interaction = "+")
+mod_lmer <- lmer(DO_mgL_HYPO~DO_demand_mgLd_HYPO+spring_temp+winter_temp+DO_date_HYPO+(1|LakeID), data = std_data) 
+vif(mod_lmer)
+hypo_do_oxic <- plot_effects_lmer(mod_lmer,"Hypolimnetic DO (oxic; mg/L)", poster = POSTER) 
+hypo_do_oxic_ridge <- plot_effects_by_lake_lmer_ridge(all_lakes_do,"Hypolimnetic DO (oxic; mg/L)",mod_lmer, poster = POSTER)
+
+###
+responses <- c("AF")
+potential_drivers <- c("DO_demand_mgLd_HYPO",
+                      "spring_temp",
+                      "summer_temp",
+                      "winter_temp",
+                      "Temp_C_HYPO"
+                      )
+aic_calculator_lmer(dataset,responses,potential_drivers, interaction = "+")
+aic_calculator_lmer(data_no_oxic,responses,potential_drivers, interaction = "+") #same results
 selected_drivers <- c("DO_demand_mgLd_HYPO","spring_temp","Temp_C_HYPO")
-std_data <- standardize_data(data_no_oxic,responses,selected_drivers)
-all_lakes_af <- mod_by_lake(data_no_oxic,responses,selected_drivers, interaction = "+")
+std_data <- standardize_data(dataset,responses,selected_drivers) #all lakes for across-lake regression
+all_lakes_af <- mod_by_lake(data_no_oxic,responses,selected_drivers, interaction = "+") #only oxic lakes here
 mod_lmer <- lmer(AF~spring_temp+DO_demand_mgLd_HYPO+Temp_C_HYPO+(1|LakeID), data = std_data) 
+mod_lmer
 vif(mod_lmer)
 af <- plot_effects_lmer(mod_lmer,"Anoxic factor", poster = POSTER) 
 af_ridge <- plot_effects_by_lake_lmer_ridge(all_lakes_af,"Anoxic factor",mod_lmer, poster = POSTER)
@@ -235,10 +246,10 @@ potential_drivers <- c("Chla_ugL_EPI",
                       "strat_Temp_C_HYPO",
                       "strat_buoyancy_freq_EPI"
                       )
-aic_calculator_lmer(data_log_chla,responses,potential_drivers, interaction = "+")
+aic_calculator_lmer(data_log_nuts,responses,potential_drivers, interaction = "+")
 selected_drivers <- c("Chla_ugL_EPI","chla_lag","strat_buoyancy_freq_EPI")
-std_data <-standardize_data(data_log_chla,responses,selected_drivers)
-all_lakes_vhod5 <- mod_by_lake(data_log_chla,responses,selected_drivers, interaction = "+")
+std_data <-standardize_data(data_log_nuts,responses,selected_drivers)
+all_lakes_vhod5 <- mod_by_lake(data_log_nuts,responses,selected_drivers, interaction = "+")
 mod_lmer <- lmer(VHOD5_mgLd_HYPO~Chla_ugL_EPI+chla_lag+strat_buoyancy_freq_EPI+(1|LakeID), data = std_data) 
 vif(mod_lmer)
 confint(mod_lmer)
