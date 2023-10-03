@@ -48,35 +48,36 @@ unique(lat_long$LakeID)[!unique(lat_long$LakeID)%in%unique(lake_bats$LakeID)] #m
 length(unique(full_with_thermo$LakeID))
 
 #Calculate volume-weighted oxygen concentrations
-vw_do <- full_with_thermo%>%
-  full_join(lake_bats, by = c("LakeID","Depth_m"))%>%
-  filter(!is.na(IntervalVolume_m3))%>%
-  filter(Depth_m>hypo_depth)%>%
-  mutate(DO_mass = DO_mgL*IntervalVolume_m3,
-         Temp_total = Temp_C*IntervalVolume_m3,
-         Year = year(Date))%>%
-  group_by(Date, LakeID)%>%
+vw_do <- full_with_thermo %>%
+  full_join(lake_bats, by = c("LakeID","Depth_m")) %>%
+  filter(!is.na(IntervalVolume_m3)) %>%
+  filter(Depth_m > hypo_depth)%>%
+  mutate(DO_mass = DO_mgL * IntervalVolume_m3,
+         Temp_total = Temp_C * IntervalVolume_m3,
+         Year = year(Date)) %>%
+  group_by(Date, LakeID) %>%
   dplyr::summarize(DO_tot = sum(DO_mass),#sum across all hypolimnetic depths
                    vol_tot = sum(IntervalVolume_m3),
-                   DO_mgL_vol = DO_tot/vol_tot,#Divide by hypolimnetic volume
-                   DO_mgL_area = DO_tot/max(Area_m2),
-                   Temp_C = sum(Temp_total)/vol_tot)%>%
-  mutate(Year= year(Date))%>%
-  group_by(LakeID, Year)%>%
-  filter(!is.na(DO_mgL_vol))%>%
-  arrange(LakeID, Date)%>%
-  mutate(low_point = ifelse(sum(DO_mgL_vol<1)==0,#Identify the lowest DO value for a given year
+                   DO_mgL_vol = DO_tot / vol_tot,#Divide by hypolimnetic volume
+                   DO_mgL_area = DO_tot / max(Area_m2),
+                   Temp_C = sum(Temp_total) / vol_tot) %>%
+  mutate(Year = year(Date)) %>%
+  group_by(LakeID, Year) %>%
+  filter(!is.na(DO_mgL_vol)) %>%
+  arrange(LakeID, Date) %>%
+  #Identify the lowest DO value for a given year
+  mutate(low_point = ifelse(sum(DO_mgL_vol < 1)==0,
                             Date[which.min(DO_mgL_vol)],
-                            first(Date[DO_mgL_vol<1])))%>%
-  filter(is.na(low_point)|Date<=low_point)%>% #Remove days after the lowest DO value
+                            first(Date[DO_mgL_vol < 1])))%>%
+  filter(is.na(low_point) | Date <= low_point)%>% #Remove days after the lowest DO value
   ungroup()
 
 length(unique(vw_do$LakeID)) #581 lakes left
 
 #Calculate the rate of change in volume-weighted concentrations using lm
 vw_do_demand <- vw_do%>%
-  mutate(Year = year(Date))%>%
-  group_by(Year, LakeID)%>%
+  mutate(Year = year(Date)) %>%
+  group_by(Year, LakeID) %>%
   dplyr::summarize(n = n(),
             DO_demand_mgLd = -lm(DO_mgL_vol~Date)$coefficients[2],
             AHOD_mgLd = -lm(DO_mgL_area~Date)$coefficients[2],
@@ -85,12 +86,12 @@ vw_do_demand <- vw_do%>%
             r2_vol = summary(lm(DO_mgL_vol~Date))$r.squared,
             r2_area = summary(lm(DO_mgL_area~Date))$r.squared,
             Temp_C = mean(Temp_C, na.rm = T))%>%
-  filter(n>=3)#Need at least 3 points
+  filter(n >= 3)#Need at least 3 points
 length(unique(vw_do_demand$LakeID[!is.na(vw_do_demand$DO_demand_mgLd)])) #418
 
 #How many rows get removed by filtering so R2>0.5? 246
 removed_by_r2 <- vw_do_demand%>%
-  filter(r2_vol>.5)
+  filter(r2_vol > .5)
 nrow(removed_by_r2[!is.na(removed_by_r2$DO_demand_mgLd),]) #5139
 nrow(vw_do_demand[!is.na(vw_do_demand$DO_demand_mgLd),]) #5385
 5385-5139
@@ -110,10 +111,10 @@ good_hod <- vw_do_demand%>%
   dplyr::summarize(n_neg = sum(DO_demand_mgLd<0),
                    n = n(),
                    pct = n_neg/n*100)%>%
-  filter(pct<=10)
+  filter(pct <= 10)
 length(unique(good_hod$LakeID)) #414
 
-vw_do_demand_qaqc <- removed_by_pos%>%
+vw_do_demand_qaqc <- removed_by_pos %>%
   filter(LakeID %in% good_hod$LakeID)
 
 nrow(vw_do_demand_qaqc[!is.na(vw_do_demand_qaqc$DO_demand_mgLd),]) #5139
@@ -127,10 +128,10 @@ write.csv(vw_do_demand_qaqc, "../Compiled data/VW oxygen demand points.csv", row
 Step 3: Calculate temperature-corrected oxygen demand values
 ```{r}
 vhod5 <- vw_do_demand_qaqc%>%
-  mutate(Temp_factor = ((Temp_C)/10)^0.65,
-         VHOD5_mgLd = DO_demand_mgLd/Temp_factor)%>%
+  mutate(Temp_factor = ((Temp_C) / 10) ^ 0.65,
+         VHOD5_mgLd = DO_demand_mgLd / Temp_factor)%>%
   filter(!is.na(VHOD5_mgLd))%>%
-  dplyr::select(Year,LakeID,Temp_factor,VHOD5_mgLd)
+  dplyr::select(Year, LakeID, Temp_factor, VHOD5_mgLd)
 
 write.csv(vhod5, "../Compiled data/VHOD5 points.csv", row.names = F)
 ```

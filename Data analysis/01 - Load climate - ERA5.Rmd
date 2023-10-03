@@ -5,7 +5,7 @@ date: "2022-10-10"
 output: html_document
 ---
 
-This script loads climate data from the ERA5 re-analysis data product and matches climate data to LakeIDs by lat/lon. The raw ERA 5 data product is too large to store on github, so will need to be re-downloaded. If you would rather skip this step, the output of this code file (temperature and precipitation records at each lake) has been created and stored on github in "./External data/historical_temp_output_era5.csv" and "./External data/historical_precip_output_era5.csv"
+This script loads climate data from the ERA5 re-analysis data product and matches climate data to LakeIDs by lat/lon. The raw ERA 5 data product is too large to store on GitHub, so will need to be re-downloaded. If you would rather skip this step, the output of this code file (temperature and precipitation records at each lake) has been created and stored on github in "./External data/historical_temp_output_era5.csv" and "./External data/historical_precip_output_era5.csv"
 
 To download ERA 5 temperature and precipitation data: https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-era5-single-levels-monthly-means?tab=form
   Product type: Monthly averaged reanalysis
