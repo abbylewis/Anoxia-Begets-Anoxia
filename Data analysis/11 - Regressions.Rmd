@@ -126,6 +126,128 @@ vif(mod_lmer)
 vhod <- plot_effects_lmer(mod_lmer,"Oxygen demand (mg/L/d)", poster = POSTER)
 vhod_ridge <- plot_effects_by_lake_lmer_ridge(all_lakes_vhod,var_name = "Oxygen demand (mg/L/d)",mod_lmer, poster = POSTER)
 
+### DO (only oxic lakes)
+responses <- c("DO_mgL_HYPO")
+potential_drivers <- c("DO_demand_mgLd_HYPO",
+                      "spring_temp",
+                      "summer_temp",
+                      "winter_temp",
+                      "Temp_C_HYPO",
+                      "DO_date_HYPO"
+                      )
+aic_calculator_lmer(data_always_oxic,responses,potential_drivers, interaction = "+")
+selected_drivers <- c("DO_demand_mgLd_HYPO", "spring_temp", "winter_temp", "DO_date_HYPO")
+std_data <- standardize_data(data_no_anoxic,responses,selected_drivers)
+all_lakes_do <- mod_by_lake(data_no_anoxic,responses,selected_drivers, interaction = "+")
+mod_lmer <- lmer(DO_mgL_HYPO~DO_demand_mgLd_HYPO+spring_temp+winter_temp+DO_date_HYPO+(1|LakeID), data = std_data) 
+vif(mod_lmer)
+hypo_do_oxic <- plot_effects_lmer(mod_lmer,"Hypolimnetic DO (oxic; mg/L)", poster = POSTER) 
+hypo_do_oxic_ridge <- plot_effects_by_lake_lmer_ridge(all_lakes_do,"Hypolimnetic DO (oxic; mg/L)",mod_lmer, poster = POSTER)
+
+### Anoxic factor
+responses <- c("AF")
+potential_drivers <- c("DO_demand_mgLd_HYPO",
+                      "spring_temp",
+                      "summer_temp",
+                      "winter_temp",
+                      "Temp_C_HYPO"
+                      )
+aic_calculator_lmer(dataset,responses,potential_drivers, interaction = "+")
+aic_calculator_lmer(data_no_oxic,responses,potential_drivers, interaction = "+") #same results
+selected_drivers <- c("DO_demand_mgLd_HYPO","spring_temp","Temp_C_HYPO")
+std_data <- standardize_data(dataset,responses,selected_drivers) #all lakes for across-lake regression
+all_lakes_af <- mod_by_lake(data_no_oxic,responses,selected_drivers, interaction = "+") #only oxic lakes here
+mod_lmer <- lmer(AF~spring_temp+DO_demand_mgLd_HYPO+Temp_C_HYPO+(1|LakeID), data = std_data) 
+mod_lmer
+vif(mod_lmer)
+af <- plot_effects_lmer(mod_lmer,"Anoxic factor", poster = POSTER) 
+af_ridge <- plot_effects_by_lake_lmer_ridge(all_lakes_af,"Anoxic factor",mod_lmer, poster = POSTER)
+
+### VHOD5
+responses <- c("VHOD5_mgLd_HYPO")
+potential_drivers <- c("Chla_ugL_EPI",
+                      "chla_lag",
+                      #"DOC_mgL_HYPO",
+                      "spring_temp",
+                      "strat_Temp_C_HYPO",
+                      "strat_buoyancy_freq_EPI"
+                      )
+aic_calculator_lmer(data_log_nuts,responses,potential_drivers, interaction = "+")
+selected_drivers <- c("Chla_ugL_EPI","chla_lag","strat_buoyancy_freq_EPI")
+std_data <-standardize_data(data_log_nuts,responses,selected_drivers)
+all_lakes_vhod5 <- mod_by_lake(data_log_nuts,responses,selected_drivers, interaction = "+")
+mod_lmer <- lmer(VHOD5_mgLd_HYPO~Chla_ugL_EPI+chla_lag+strat_buoyancy_freq_EPI+(1|LakeID), data = std_data) 
+vif(mod_lmer)
+confint(mod_lmer)
+summary(mod_lmer)
+plot_effects_lmer(mod_lmer,"Temperature-corrected oxygen demand") 
+plot_effects_by_lake_lmer_ridge(all_lakes_vhod5,"Temperature-corrected oxygen demand",mod_lmer)
+
+### Epi. TP
+responses <- c("strat_TP_ugL_EPI")
+potential_drivers <- c("TP_ugL_HYPO",
+                      "hypo_p_lag",
+                      "epi_p_lag",
+                      "spring_precip",
+                      "summer_precip",
+                      "winter_precip",
+                      "strat_buoyancy_freq_EPI",
+                      "strat_TP_date_EPI"
+                      )
+aic_calculator_lmer(data_log_nuts,responses,potential_drivers, interaction = "+")
+selected_drivers <- c("TP_ugL_HYPO","hypo_p_lag","epi_p_lag","spring_precip","summer_precip","strat_TP_date_EPI")
+std_data <- standardize_data(data_log_nuts,responses,selected_drivers)
+all_lakes_epiP <- mod_by_lake(data_log_nuts,responses,selected_drivers, interaction = "+")
+mod_lmer <- lmer(strat_TP_ugL_EPI~TP_ugL_HYPO+hypo_p_lag+epi_p_lag+spring_precip+summer_precip+strat_TP_date_EPI+(1|LakeID), data = std_data)
+vif(mod_lmer)
+epi_p <- plot_effects_lmer(mod_lmer,"Epilimnetic TP (µg/L)", poster = POSTER) 
+epi_p_ridge <- plot_effects_by_lake_lmer_ridge(all_lakes_epiP,"Epilimnetic TP (µg/L)",mod_lmer, poster = POSTER)
+
+### TP with AF
+responses <- c("TP_ugL_HYPO")
+potential_drivers <- c("strat_TP_ugL_EPI",
+                      "strat_buoyancy_freq_EPI",
+                      "strat_Temp_C_HYPO",
+                      "spring_precip",
+                      "summer_precip",
+                      "winter_precip",
+                      "TP_date_HYPO",
+                      "AF"
+                      )
+aic_calculator_lmer(data_log_nuts,responses,potential_drivers, interaction = "+")
+selected_drivers <- c("strat_TP_ugL_EPI","AF")
+std_data <-standardize_data(data_log_nuts,responses,selected_drivers)
+all_lakes_hypoP_af <- mod_by_lake(data_log_nuts,responses,selected_drivers, interaction = "+")
+mod_lmer <- lmer(TP_ugL_HYPO~strat_TP_ugL_EPI+AF+(1|LakeID), data = std_data)
+vif(mod_lmer)
+hypo_p_af <- plot_effects_lmer(mod_lmer,"Hypolimnetic TP (µg/L)", poster = POSTER) 
+hypo_p_ridge_af <- plot_effects_by_lake_lmer_ridge(all_lakes_hypoP_af,"Hypolimnetic TP (µg/L)",mod_lmer, poster = POSTER)
+
+### Epi. chl-a
+responses <- c("Chla_ugL_EPI")
+potential_drivers <- c("strat_TP_ugL_EPI",
+                      "strat_TN_ugL_EPI", 
+                      "spring_temp",
+                      "summer_temp",
+                      "Chla_date_EPI")
+
+length(unique(data_log_nuts$LakeID[!is.na(data_log_nuts$strat_TN_ugL_EPI)])) #76
+length(unique(data_log_nuts$LakeID[!is.na(data_log_nuts$strat_TP_ugL_EPI)])) #368
+
+aic_calculator_lmer(data_log_nuts,responses,potential_drivers, interaction = "+")
+selected_drivers <- c("spring_temp","strat_TP_ugL_EPI")
+std_data <- standardize_data(data_log_nuts,responses,selected_drivers)
+all_lakes_chla <- mod_by_lake(data_log_nuts,responses,selected_drivers, interaction = "+")
+mod_lmer <- lmer(Chla_ugL_EPI~spring_temp+strat_TP_ugL_EPI+(1|LakeID), data = std_data) 
+summary(mod_lmer)
+vif(mod_lmer)
+epi_chla <- plot_effects_lmer(mod_lmer,"Epilimnetic chl-a (µg/L)", poster = POSTER) 
+epi_chla_ridge <- plot_effects_by_lake_lmer_ridge(all_lakes_chla,"Epilimnetic chl-a (µg/L)",mod_lmer, poster = POSTER)
+```
+
+
+Segmented DO regression (could be cut?)
+```{r}
 ### DO (rather than anoxic factor)
 responses <- c("DO_mgL_HYPO")
 potential_drivers <- c("DO_demand_mgLd_HYPO",
@@ -199,104 +321,11 @@ dataset%>%
   theme(legend.position = "bottom")
 ggsave(paste0("../Figures/DO_VHOD.jpeg"),
        width = 4, height = 4, units = "in")
+```
 
-### DO (only oxic lakes)
-responses <- c("DO_mgL_HYPO")
-potential_drivers <- c("DO_demand_mgLd_HYPO",
-                      "spring_temp",
-                      "summer_temp",
-                      "winter_temp",
-                      "Temp_C_HYPO",
-                      "DO_date_HYPO"
-                      )
-aic_calculator_lmer(data_always_oxic,responses,potential_drivers, interaction = "+")
-selected_drivers <- c("DO_demand_mgLd_HYPO", "spring_temp", "winter_temp", "DO_date_HYPO")
-std_data <- standardize_data(data_no_anoxic,responses,selected_drivers)
-all_lakes_do <- mod_by_lake(data_no_anoxic,responses,selected_drivers, interaction = "+")
-mod_lmer <- lmer(DO_mgL_HYPO~DO_demand_mgLd_HYPO+spring_temp+winter_temp+DO_date_HYPO+(1|LakeID), data = std_data) 
-vif(mod_lmer)
-hypo_do_oxic <- plot_effects_lmer(mod_lmer,"Hypolimnetic DO (oxic; mg/L)", poster = POSTER) 
-hypo_do_oxic_ridge <- plot_effects_by_lake_lmer_ridge(all_lakes_do,"Hypolimnetic DO (oxic; mg/L)",mod_lmer, poster = POSTER)
 
-###
-responses <- c("AF")
-potential_drivers <- c("DO_demand_mgLd_HYPO",
-                      "spring_temp",
-                      "summer_temp",
-                      "winter_temp",
-                      "Temp_C_HYPO"
-                      )
-aic_calculator_lmer(dataset,responses,potential_drivers, interaction = "+")
-aic_calculator_lmer(data_no_oxic,responses,potential_drivers, interaction = "+") #same results
-selected_drivers <- c("DO_demand_mgLd_HYPO","spring_temp","Temp_C_HYPO")
-std_data <- standardize_data(dataset,responses,selected_drivers) #all lakes for across-lake regression
-all_lakes_af <- mod_by_lake(data_no_oxic,responses,selected_drivers, interaction = "+") #only oxic lakes here
-mod_lmer <- lmer(AF~spring_temp+DO_demand_mgLd_HYPO+Temp_C_HYPO+(1|LakeID), data = std_data) 
-mod_lmer
-vif(mod_lmer)
-af <- plot_effects_lmer(mod_lmer,"Anoxic factor", poster = POSTER) 
-af_ridge <- plot_effects_by_lake_lmer_ridge(all_lakes_af,"Anoxic factor",mod_lmer, poster = POSTER)
-
-###
-responses <- c("VHOD5_mgLd_HYPO")
-potential_drivers <- c("Chla_ugL_EPI",
-                      "chla_lag",
-                      #"DOC_mgL_HYPO",
-                      "spring_temp",
-                      "strat_Temp_C_HYPO",
-                      "strat_buoyancy_freq_EPI"
-                      )
-aic_calculator_lmer(data_log_nuts,responses,potential_drivers, interaction = "+")
-selected_drivers <- c("Chla_ugL_EPI","chla_lag","strat_buoyancy_freq_EPI")
-std_data <-standardize_data(data_log_nuts,responses,selected_drivers)
-all_lakes_vhod5 <- mod_by_lake(data_log_nuts,responses,selected_drivers, interaction = "+")
-mod_lmer <- lmer(VHOD5_mgLd_HYPO~Chla_ugL_EPI+chla_lag+strat_buoyancy_freq_EPI+(1|LakeID), data = std_data) 
-vif(mod_lmer)
-confint(mod_lmer)
-summary(mod_lmer)
-plot_effects_lmer(mod_lmer,"Temperature-corrected oxygen demand") 
-plot_effects_by_lake_lmer_ridge(all_lakes_vhod5,"Temperature-corrected oxygen demand",mod_lmer)
-
-###
-responses <- c("strat_TP_ugL_EPI")
-potential_drivers <- c("TP_ugL_HYPO",
-                      "hypo_p_lag",
-                      "epi_p_lag",
-                      "spring_precip",
-                      "summer_precip",
-                      "winter_precip",
-                      "strat_buoyancy_freq_EPI",
-                      "strat_TP_date_EPI"
-                      )
-aic_calculator_lmer(data_log_nuts,responses,potential_drivers, interaction = "+")
-selected_drivers <- c("TP_ugL_HYPO","hypo_p_lag","epi_p_lag","spring_precip","summer_precip","strat_TP_date_EPI")
-std_data <- standardize_data(data_log_nuts,responses,selected_drivers)
-all_lakes_epiP <- mod_by_lake(data_log_nuts,responses,selected_drivers, interaction = "+")
-mod_lmer <- lmer(strat_TP_ugL_EPI~TP_ugL_HYPO+hypo_p_lag+epi_p_lag+spring_precip+summer_precip+strat_TP_date_EPI+(1|LakeID), data = std_data)
-vif(mod_lmer)
-epi_p <- plot_effects_lmer(mod_lmer,"Epilimnetic TP (µg/L)", poster = POSTER) 
-epi_p_ridge <- plot_effects_by_lake_lmer_ridge(all_lakes_epiP,"Epilimnetic TP (µg/L)",mod_lmer, poster = POSTER)
-
-### With AF
-responses <- c("TP_ugL_HYPO")
-potential_drivers <- c(#"DO_mgL_HYPO",
-                      "strat_TP_ugL_EPI",
-                      "strat_buoyancy_freq_EPI",
-                      "strat_Temp_C_HYPO",
-                      "spring_precip",
-                      "summer_precip",
-                      "winter_precip",
-                      "TP_date_HYPO",
-                      "AF"
-                      )
-aic_calculator_lmer(data_log_nuts,responses,potential_drivers, interaction = "+")
-selected_drivers <- c("strat_TP_ugL_EPI","AF")
-std_data <-standardize_data(data_log_nuts,responses,selected_drivers)
-all_lakes_hypoP_af <- mod_by_lake(data_log_nuts,responses,selected_drivers, interaction = "+")
-mod_lmer <- lmer(TP_ugL_HYPO~strat_TP_ugL_EPI+AF+(1|LakeID), data = std_data)
-vif(mod_lmer)
-hypo_p_af <- plot_effects_lmer(mod_lmer,"Hypolimnetic TP (µg/L)", poster = POSTER) 
-hypo_p_ridge_af <- plot_effects_by_lake_lmer_ridge(all_lakes_hypoP_af,"Hypolimnetic TP (µg/L)",mod_lmer, poster = POSTER)
+Segmented TP regression
+```{r}
 ### Without AF
 responses <- c("TP_ugL_HYPO")
 potential_drivers <- c("DO_mgL_HYPO",
@@ -361,27 +390,6 @@ status <- data_log_nuts%>%
   dplyr::summarize(status = ifelse(max(DO_mgL_HYPO,na.rm = T)<1, "Anoxic\n(max. DO < 1)",
                                    ifelse(min(DO_mgL_HYPO, na.rm = T)<1,"Variable",
                                           "Oxic\n(min. DO > 1)")))
-
-###
-responses <- c("Chla_ugL_EPI")
-potential_drivers <- c("strat_TP_ugL_EPI",
-                      "strat_TN_ugL_EPI", 
-                      "spring_temp",
-                      "summer_temp",
-                      "Chla_date_EPI")
-
-length(unique(data_log_nuts$LakeID[!is.na(data_log_nuts$strat_TN_ugL_EPI)])) #76
-length(unique(data_log_nuts$LakeID[!is.na(data_log_nuts$strat_TP_ugL_EPI)])) #368
-
-aic_calculator_lmer(data_log_nuts,responses,potential_drivers, interaction = "+")
-selected_drivers <- c("spring_temp","strat_TP_ugL_EPI")
-std_data <- standardize_data(data_log_nuts,responses,selected_drivers)
-all_lakes_chla <- mod_by_lake(data_log_nuts,responses,selected_drivers, interaction = "+")
-mod_lmer <- lmer(Chla_ugL_EPI~spring_temp+strat_TP_ugL_EPI+(1|LakeID), data = std_data) 
-summary(mod_lmer)
-vif(mod_lmer)
-epi_chla <- plot_effects_lmer(mod_lmer,"Epilimnetic chl-a (µg/L)", poster = POSTER) 
-epi_chla_ridge <- plot_effects_by_lake_lmer_ridge(all_lakes_chla,"Epilimnetic chl-a (µg/L)",mod_lmer, poster = POSTER)
 ```
 
 
