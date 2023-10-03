@@ -9,11 +9,8 @@ This file analyzes relevant lags for ABA relationships of interest.
 
 Table of contents:
 Step 1: Load packages and data
-Step 2: Hypo. DO vs. TP lag
-Step 3: Hypo. TP vs epi. TP lag
-Step 4: Epi. TP vs chl-a lag
-Step 5: Chl-a vs VHOD lag
-Step 6: VHOD vs hypo. DO lag
+Step 2: Create function to calculate lags and plot
+Step 3: Generate all figures
 
 
 Step 1: Load packages and data
@@ -29,215 +26,125 @@ with_temp <- read.csv("../Compiled data/All_data_annual.csv")
 ```
 
 
-Step 2: Hypo. DO vs. TP lag
+Step 2: Create function to calculate lags and plot
 ```{r}
-p_do_stat <- with_temp%>%
-  unique()%>%
-  group_by(LakeID)%>%
-  arrange(LakeID,Year)%>%
-  mutate(do_lag = lag(DO_mgL_HYPO),
-         do_lag2 = lag(do_lag),
-         do_lag2 = ifelse(lag(lag(Year))==Year-2,do_lag2,NA),
-         lag_is_last_year = ifelse(lag(Year)==(Year-1),T,F))%>%
-  filter(lag_is_last_year)%>%
-  pivot_longer(cols = c(DO_mgL_HYPO,do_lag,do_lag2))%>% #, chla_lag3
-  filter(!is.na(value),!is.na(TP_ugL_HYPO))%>%
-  group_by(name,LakeID)%>%
-  mutate(nyear = length(unique(Year)))%>%
-  arrange(LakeID)%>%
-  filter(nyear>=10,
-         #(max(value)-min(value))>1,
-         #min(value)<(0.7*max(value))
-         )%>%
-  dplyr::summarize(p_do = cor.test(TP_ugL_HYPO,value,method = "spearman")$estimate
-    #demand_chla = pcor.test(DO_demand_mgLd_HYPO,value,Year,method = "spearman")$estimate
-            )
-
-jpeg("../Figures/Hypo P vs DO lag.jpg", width = 4, height = 3.5, res = 300, units = "in")
-p_do_stat%>%
-  group_by(name)%>%
-  mutate(p = wilcox.test(p_do)$p.value,
-         n = n())%>%
-  ggplot(aes(x=factor(name, levels = c("do_lag3","do_lag2","do_lag","DO_mgL_HYPO","do_lead","do_lead2"), labels = c("t-3","t-2","t-1","t","t+1", "t+2")),y=p_do))+
-  geom_hline(yintercept = 0)+
-  geom_boxplot(aes(color = p<0.05), outlier.shape = NA)+
-  geom_jitter(width = 0.15, color = "grey20", fill = "white",shape = 21)+
-  geom_text(aes(label = paste0("n = ",n), y = max(p_do)+.1))+
-  ylab("Correlation between hypo. DO and hypo. TP")+
-  scale_color_manual(values = c("grey50","#FB8B24"), breaks = c(F,T),labels = c("FALSE","TRUE"),drop = F, name = "p < 0.05")+
-  xlab("Hypo. DO lag")+
-  theme_bw()
-dev.off()
+plot_lags <- function(response_var, 
+                      driver_var, 
+                      data, ylab, 
+                      xlab) {
+  
+  #Parse variable names
+  response <- sym(response_var)
+  driver <- sym(driver_var)
+  
+  #Calculate correlations
+  driver_response_stat <- data %>%
+    rename(driver = !!driver) %>%
+    unique() %>%
+    group_by(LakeID) %>%
+    arrange(LakeID, Year) %>%
+    mutate(driver_lag := lag(driver),
+           driver_lag2 = lag(driver_lag),
+           driver_lag2 := ifelse(lag(lag(Year)) == (Year - 2),
+                                 driver_lag2,
+                                 NA),
+           lag_is_last_year = ifelse(lag(Year) == (Year - 1), T, F)) %>%
+    filter(lag_is_last_year) %>%
+    pivot_longer(cols = c(driver, 
+                          driver_lag, 
+                          driver_lag2)) %>%
+    filter(!is.na(value), !is.na(!!response)) %>%
+    group_by(name, LakeID) %>%
+    mutate(nyear = length(unique(Year))) %>%
+    arrange(LakeID) %>%
+    filter(nyear >= 10) %>%
+    dplyr::summarize(driver_response = cor.test(!!response, 
+                                                value, 
+                                                method = "spearman")$estimate)
+  
+  #Plot
+  plot = driver_response_stat%>%
+    group_by(name)%>%
+    mutate(p = wilcox.test(driver_response)$p.value,
+           n = n())%>%
+    ggplot(aes(x=factor(name, 
+                        levels = c("driver_lag2","driver_lag","driver"), 
+                        labels = c("t-2","t-1","t")), 
+               y = driver_response))+
+    geom_hline(yintercept = 0)+
+    geom_boxplot(aes(color = p < 0.05), outlier.shape = NA)+
+    geom_jitter(width = 0.15, color = "grey20", fill = "white", shape = 21)+
+    geom_text(aes(label = paste0("n = ",n), 
+                  y = max(driver_response, na.rm = T) + 0.1))+
+    ylab(ylab)+
+    scale_color_manual(values = c("grey50","#FB8B24"), 
+                       breaks = c(F,T),
+                       labels = c("FALSE","TRUE"),
+                       drop = F, 
+                       name = "p < 0.05")+
+    xlab(xlab)+
+    theme_bw()
+  
+  return(plot)
+}
 ```
 
 
-Step 3: Hypo. TP vs epi. TP lag
+Step 3: Generate all figures
 ```{r}
-p_p_stat <- with_temp%>%
-  unique()%>%
-  group_by(LakeID)%>%
-  arrange(LakeID,Year)%>%
-  mutate(p_lag = lag(TP_ugL_HYPO),
-         p_lag2 = lag(p_lag),
-         p_lag2 = ifelse(lag(lag(Year))==Year-2,p_lag2,NA),
-         lag_is_last_year = ifelse(lag(Year)==(Year-1),T,F))%>%
-  filter(lag_is_last_year)%>%
-  pivot_longer(cols = c(TP_ugL_HYPO,p_lag,p_lag2))%>% #, chla_lag3
-  filter(!is.na(value),!is.na(TP_ugL_EPI))%>%
-  group_by(name,LakeID)%>%
-  mutate(nyear = length(unique(Year)))%>%
-  arrange(LakeID)%>%
-  filter(nyear>=10,
-         #(max(value)-min(value))>1,
-         #min(value)<(0.7*max(value))
-         )%>%
-  dplyr::summarize(p_p = cor.test(TP_ugL_EPI,value,method = "spearman")$estimate
-    #demand_chla = pcor.test(DO_demand_mgLd_HYPO,value,Year,method = "spearman")$estimate
-            )
+jpeg("../Figures/Hypo P vs DO lag.jpg", width = 4, height = 3.5, res = 300, units = "in")
+plot_lags(driver = "DO_mgL_HYPO", 
+          response = "TP_ugL_HYPO", 
+          data = with_temp,
+          ylab = "Correlation between hypo. DO and hypo. TP",
+          xlab = "Hypo. DO lag")
+dev.off()
+
+jpeg("../Figures/Hypo P vs AF lag.jpg", width = 4, height = 3.5, res = 300, units = "in")
+plot_lags(driver = "AF", 
+          response = "TP_ugL_HYPO", 
+          data = with_temp,
+          ylab = "Correlation between AF and hypo. TP",
+          xlab = "Anoxic factor lag")
+dev.off()
 
 jpeg("../Figures/Epi P vs hypo P lag.jpg", width = 4, height = 3.5, res = 300, units = "in")
-p_p_stat%>%
-  mutate(p = wilcox.test(p_p)$p.value,
-         n = n())%>%
-  ggplot(aes(x=factor(name, levels = c("p_lag3","p_lag2","p_lag","TP_ugL_HYPO","p_lead","p_lead2"), labels = c("t-3","t-2","t-1","t","t+1", "t+2")),y=p_p))+
-  geom_hline(yintercept = 0)+
-  geom_boxplot(aes(color = p<0.05), outlier.shape = NA)+
-  geom_jitter(width = 0.15, color = "grey20", fill = "white",shape = 21)+
-  geom_text(aes(label = paste0("n = ",n), y = max(p_p)+.1))+
-  ylab("Correlation between hypo. TP and epi. TP")+
-  scale_color_manual(values = c("grey50","#FB8B24"))+
-  xlab("Hypo. TP lag")+
-  theme_bw()
+plot_lags(driver = "TP_ugL_HYPO", 
+          response = "TP_ugL_EPI", 
+          data = with_temp,
+          ylab = "Correlation between hypo. TP and epi. TP",
+          xlab = "Hypo. TP lag")
 dev.off()
-```
-
-
-Step 4: Epi. TP vs chl-a lag
-```{r}
-p_chla_stat <- with_temp%>%
-  unique()%>%
-  group_by(LakeID)%>%
-  arrange(LakeID,Year)%>%
-  mutate(p_lag = lag(strat_TP_ugL_EPI),
-         p_lag2 = lag(p_lag),
-         p_lag2 = ifelse(lag(lag(Year))==Year-2,p_lag2,NA),
-         lag_is_last_year = ifelse(lag(Year)==(Year-1),T,F))%>%
-  filter(lag_is_last_year)%>%
-  pivot_longer(cols = c(strat_TP_ugL_EPI,p_lag,p_lag2))%>% #, chla_lag3
-  filter(!is.na(value),!is.na(Chla_ugL_EPI))%>%
-  group_by(name,LakeID)%>%
-  mutate(nyear = length(unique(Year)))%>%
-  arrange(LakeID)%>%
-  filter(nyear>=10,
-         #(max(value)-min(value))>1,
-         #min(value)<(0.7*max(value))
-         )%>%
-  dplyr::summarize(chla_p = cor.test(Chla_ugL_EPI,value,method = "spearman")$estimate
-    #demand_chla = pcor.test(DO_demand_mgLd_HYPO,value,Year,method = "spearman")$estimate
-            )
 
 jpeg("../Figures/Epi P vs chl-a lag.jpg", width = 4, height = 3.5, res = 300, units = "in")
-p_chla_stat%>%
-  mutate(p = wilcox.test(chla_p)$p.value,
-         n = n())%>%
-  ggplot(aes(x=factor(name, levels = c("p_lag3","p_lag2","p_lag","strat_TP_ugL_EPI","p_lead","p_lead2"), labels = c("t-3","t-2","t-1","t","t+1", "t+2")),y=chla_p))+
-  geom_hline(yintercept = 0)+
-  geom_boxplot(aes(color = p<0.05), outlier.shape = NA)+
-  geom_jitter(width = 0.15, color = "grey20", fill = "white",shape = 21)+
-  geom_text(aes(label = paste0("n = ",n), y = max(chla_p)+.1))+
-  ylab("Correlation between epi. TP and chl-a")+
-  scale_color_manual(values = c("grey50","#FB8B24"), breaks = c(F,T),labels = c("FALSE","TRUE"),drop = F, name = "p < 0.05")+
-  xlab("Epi. TP lag")+
-  theme_bw()
+plot_lags(driver = "strat_TP_ugL_EPI", 
+          response = "Chla_ugL_EPI", 
+          data = with_temp,
+          ylab = "Correlation between epi. TP and chl-a",
+          xlab = "Epi. TP lag")
 dev.off()
-```
-
-
-Step 5: Chl-a vs VHOD lag
-```{r}
-chla_demand_stat <- with_temp%>%
-  unique()%>%
-  group_by(LakeID)%>%
-  arrange(LakeID,Year)%>%
-  mutate(do_lag = lag(DO_mgL_HYPO),
-         chla_lag = lag(Chla_ugL_EPI),
-         chla_lag2 = lag(chla_lag),
-         chla_lag2 = ifelse(lag(lag(Year))==Year-2,chla_lag2,NA),
-         #chla_lag3 = lag(chla_lag2),
-         #chla_lag3 = ifelse(lag(lag(lag(Year)))==Year-3,chla_lag3,NA),
-         lag_is_last_year = ifelse(lag(Year)==(Year-1),T,F))%>%
-  filter(lag_is_last_year)%>%
-  pivot_longer(cols = c(Chla_ugL_EPI,chla_lag, chla_lag2))%>% #, chla_lag3
-  filter(!is.na(value),!is.na(DO_demand_mgLd_HYPO))%>%
-  group_by(name,LakeID)%>%
-  mutate(nyear = length(unique(Year)))%>%
-  arrange(LakeID)%>%
-  filter(nyear>=10,
-         #(max(value)-min(value))>1,
-         #min(value)<(0.7*max(value))
-         )%>%
-  dplyr::summarize(demand_chla = cor.test(DO_demand_mgLd_HYPO,value,method = "spearman")$estimate
-    #demand_chla = pcor.test(DO_demand_mgLd_HYPO,value,Year,method = "spearman")$estimate
-            )
 
 jpeg("../Figures/Chla vs Demand lag.jpg", width = 4, height = 3.5, res = 300, units = "in")
-chla_demand_stat%>%
-  group_by(name)%>%
-  mutate(p = wilcox.test(demand_chla)$p.value,
-         n = n(),
-         color = p<0.05,
-         color = factor(color,levels = c(T,F)))%>%
-  ggplot(aes(x=factor(name, levels = c("chla_lag3","chla_lag2","chla_lag","Chla_ugL_EPI","chla_lead","chla_lead2"), labels = c("t-3","t-2","t-1","t","t+1", "t+2")),y=demand_chla))+
-  geom_hline(yintercept = 0)+
-  geom_boxplot(aes(color = color), outlier.shape = NA)+
-  geom_jitter(width = 0.15, color = "grey20", fill = "white",shape = 21)+
-  geom_text(aes(label = paste0("n = ",n), y = max(demand_chla)+.1))+
-  ylab("Correlation between chl-a and VHOD")+
-  scale_color_manual(values = c("grey50","#FB8B24"), breaks = c(F,T),labels = c("FALSE","TRUE"),drop = F, name = "p < 0.05")+
-  xlab("Chl-a lag")+
-  theme_bw()
+plot_lags(driver = "Chla_ugL_EPI", 
+          response = "DO_demand_mgLd_HYPO", 
+          data = with_temp,
+          ylab = "Correlation between epi. chl-a and VHOD",
+          xlab = "Epi. chl-a lag")
 dev.off()
-```
-
-
-Step 6: VHOD vs hypo. DO lag
-```{r}
-do_vhod_stat <- with_temp%>%
-  unique()%>%
-  group_by(LakeID)%>%
-  arrange(LakeID,Year)%>%
-  mutate(vhod_lag = lag(DO_demand_mgLd_HYPO),
-         vhod_lag2 = lag(vhod_lag),
-         vhod_lag2 = ifelse(lag(lag(Year))==Year-2,vhod_lag2,NA),
-         lag_is_last_year = ifelse(lag(Year)==(Year-1),T,F))%>%
-  filter(lag_is_last_year)%>%
-  pivot_longer(cols = c(DO_demand_mgLd_HYPO,vhod_lag,vhod_lag2))%>% #, chla_lag3
-  filter(!is.na(value),!is.na(DO_mgL_HYPO))%>%
-  group_by(name,LakeID)%>%
-  mutate(nyear = length(unique(Year)))%>%
-  arrange(LakeID)%>%
-  filter(nyear>=10,
-         #min(value)<(0.7*max(value))
-         )%>%
-  dplyr::summarize(do_vhod = cor.test(DO_mgL_HYPO,value,method = "spearman")$estimate
-    #demand_chla = pcor.test(DO_demand_mgLd_HYPO,value,Year,method = "spearman")$estimate
-            )
 
 jpeg("../Figures/Hypo. DO vs vhod lag.jpg", width = 4, height = 3.5, res = 300, units = "in")
-do_vhod_stat%>%
-  group_by(name)%>%
-  mutate(p = wilcox.test(do_vhod)$p.value,
-         n = n(),
-         color = p<0.05,
-         color = factor(color,levels = c(T,F)))%>%
-  ggplot(aes(x=factor(name, levels = c("vhod_lag3","vhod_lag2","vhod_lag","DO_demand_mgLd_HYPO","vhod_lead","vhod_lead2"), labels = c("t-3","t-2","t-1","t","t+1", "t+2")),y=do_vhod))+
-  geom_hline(yintercept = 0)+
-  geom_boxplot(aes(color = color), outlier.shape = NA)+
-  geom_jitter(width = 0.15, color = "grey20", fill = "white",shape = 21)+
-  geom_text(aes(label = paste0("n = ",n), y = max(do_vhod)+.1))+
-  ylab("Correlation between VHOD and hypo. DO")+
-  scale_color_manual(values = c("grey50","#FB8B24"), breaks = c(F,T),labels = c("FALSE","TRUE"),drop = F, name = "p < 0.05")+
-  xlab("Hypo. VHOD lag")+
-  theme_bw()
+plot_lags(driver = "DO_demand_mgLd_HYPO", 
+          response = "DO_mgL_HYPO", 
+          data = with_temp,
+          ylab = "Correlation between VHOD and hypo. DO",
+          xlab = "VHOD lag")
+dev.off()
+
+jpeg("../Figures/AF vs vhod lag.jpg", width = 4, height = 3.5, res = 300, units = "in")
+plot_lags(driver = "DO_demand_mgLd_HYPO", 
+          response = "AF", 
+          data = with_temp,
+          ylab = "Correlation between VHOD and AF",
+          xlab = "VHOD lag")
 dev.off()
 ```
