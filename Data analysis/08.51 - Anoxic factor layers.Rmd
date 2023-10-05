@@ -5,8 +5,7 @@ date: "2022-08-29"
 output: html_document
 ---
 
-This file ___
-
+Using two layers
 
 Step 1: Load data and packages
 ```{r setup, include=FALSE}
@@ -32,7 +31,7 @@ lake_bats <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/b
   filter(Area_m2>0)%>%
   group_by(LakeID)%>%
   mutate(methods_n = length(unique(Method)))%>%
-  filter(methods_n==1|Method=="model")%>%
+  filter(methods_n==1|Method=="data")%>%
   ungroup()
 
 #Check bathymetric data availability
@@ -49,15 +48,16 @@ vw_do <- full_with_thermo%>%
   filter(Depth_m>hypo_depth)%>%
   mutate(DO_mass = DO_mgL*IntervalVolume_m3,
          Temp_total = Temp_C*IntervalVolume_m3,
-         Year = year(Date))%>%
-  group_by(Date, LakeID)%>%
+         Year = year(Date),
+         breakpoint = (MaximumDepth_m - hypo_depth)/2 + hypo_depth,
+         hypo_strata = ifelse(Depth_m < breakpoint, "upper", "lower"))%>%
+  group_by(Date, LakeID, hypo_strata)%>%
   dplyr::summarize(DO_tot = sum(DO_mass),#sum across all hypolimnetic depths
                    vol_tot = sum(IntervalVolume_m3),
                    DO_mgL_vol = DO_tot/vol_tot,#Divide by hypolimnetic volume
-                   DO_mgL_area = DO_tot/max(Area_m2),
-                   Temp_C = sum(Temp_total)/vol_tot)%>%
+                   )%>%
   mutate(Year= year(Date))%>%
-  group_by(LakeID, Year)%>%
+  group_by(LakeID, Year, hypo_strata)%>%
   filter(!is.na(DO_mgL_vol))%>%
   arrange(LakeID, Date)%>%
   mutate(low_point = ifelse(sum(DO_mgL_vol<1)==0,#Identify the lowest DO value for a given year
@@ -70,19 +70,6 @@ vw_do <- full_with_thermo%>%
 length(unique(vw_do$LakeID)) #581 lakes left
 ```
 
-Step 3: Model end of stratification date
-```{r}
-strat_end <- read.csv("../Compiled data/All_data_annual.csv")%>%
-  mutate(strat_end_model = 10^(2.62 - 
-                           (0.116 * log10(strat_Temp_C_HYPO)) + 
-                           (0.042 * log10(MeanDepth_m)) - 
-                           (0.002 * Latitude_DD))) 
-
-strat_end %>%
-  ggplot(aes(x = strat_end_model))+
-  geom_histogram()
-```
-
 Step 4: Model start of anoxia date using oxygen demand
 ```{r}
 #Calculate the rate of change in volume-weighted concentrations using lm
@@ -91,20 +78,16 @@ DO_THRESH = 1.7
 vw_do_demand <- vw_do%>%
   mutate(Year = year(Date),
          DOY = yday(Date))%>%
-  group_by(Year, LakeID)%>%
+  group_by(Year, LakeID, hypo_strata)%>%
   dplyr::summarize(n = n(),
             DO_demand_mgLd = -lm(DO_mgL_vol~DOY)$coefficients[2],
-            AHOD_mgLd = -lm(DO_mgL_area~DOY)$coefficients[2],
-            p_vol = summary(lm(DO_mgL_vol~DOY))$coefficients[8],
-            p_area = summary(lm(DO_mgL_area~DOY))$coefficients[8],
             r2_vol = summary(lm(DO_mgL_vol~DOY))$r.squared,
-            r2_area = summary(lm(DO_mgL_area~DOY))$r.squared,
-            Temp_C = mean(Temp_C, na.rm = T),
             anoxic_onset = (DO_THRESH - lm(DO_mgL_vol~DOY)$coefficients[1]) / 
               lm(DO_mgL_vol~DOY)$coefficients[2])%>%
   filter(n>=3)#Need at least 3 points
 
-#How many rows get removed by filtering so R2>0.5? 246
+
+#How many rows get removed by filtering so R2>0.5? ~500
 removed_by_r2 <- vw_do_demand%>%
   filter(r2_vol>.5)
 
@@ -114,7 +97,7 @@ removed_by_pos <- removed_by_r2%>%
 
 #Finish QAQC
 good_hod <- vw_do_demand%>%
-  group_by(LakeID)%>%
+  group_by(LakeID, hypo_strata)%>%
   filter(!is.na(DO_demand_mgLd),
          r2_vol>0.5
          )%>%
@@ -136,147 +119,51 @@ Step 5: Empirically calculate start and end of anoxia date if it can be determin
 PROXIMITY = 7
 
 empirical_anoxic_onset <- vw_do %>%
-  group_by(LakeID, Year)%>%
+  group_by(LakeID, Year, hypo_strata) %>%
   filter(sum(DO_mgL_vol < DO_THRESH, na.rm = T) >= 1,
          sum(DO_mgL_vol > DO_THRESH, na.rm = T) >= 1) %>%
   mutate(onset = first(Date[DO_mgL_vol < DO_THRESH]),
          before = last(Date[Date<onset]),
          interval = as.numeric(onset-before),
          range = DO_mgL_vol[Date==before] - DO_mgL_vol[Date==onset],
-         fraction = (DO_mgL_vol[Date==before] - DO_THRESH) / range)%>%
+         fraction = (DO_mgL_vol[Date==before] - DO_THRESH) / range) %>%
   filter(interval <= PROXIMITY) %>%
-  summarize(anoxic_onset_data = unique(yday(before) + fraction * interval))
+  summarize(anoxic_onset_data = unique(yday(before) + fraction * interval)) 
 
-empirical_anoxic_end <- full_with_thermo%>%
+breaks <- full_with_thermo %>%
   full_join(lake_bats, by = c("LakeID","Depth_m"))%>%
-  filter(!is.na(IntervalVolume_m3))%>%
-  filter(Depth_m > hypo_depth)%>%
-  mutate(DO_mass = DO_mgL*IntervalVolume_m3,
-         Temp_total = Temp_C*IntervalVolume_m3,
-         Year = year(Date))%>%
-  group_by(Date, LakeID)%>%
-  dplyr::summarize(DO_tot = sum(DO_mass),#sum across all hypolimnetic depths
-                   vol_tot = sum(IntervalVolume_m3),
-                   DO_mgL_vol = DO_tot/vol_tot) %>%#Divide by hypolimnetic volume
-  mutate(Year= year(Date))%>%
-  group_by(LakeID, Year)%>%
-  filter(!is.na(DO_mgL_vol),
-         sum(DO_mgL_vol < DO_THRESH, na.rm = T) >= 1,
-         sum(DO_mgL_vol > DO_THRESH, na.rm = T) >= 1) %>%
-  mutate(last = last(Date[DO_mgL_vol < DO_THRESH]),
-         after = first(Date[Date > last]),
-         interval = as.numeric(after - last),
-         range = DO_mgL_vol[Date == after] - DO_mgL_vol[Date ==  last],
-         fraction = (DO_mgL_vol[Date == after] - DO_THRESH) / range)%>%
-  filter(interval <= PROXIMITY) %>%
-  summarize(anoxic_end_data = unique(yday(after) - (fraction * interval)))
+  filter(!is.na(MaximumDepth_m),
+         !is.na(hypo_depth),
+         Depth_m > hypo_depth,
+         !is.na(Area_m2)) %>%
+  mutate(breakpoint = (MaximumDepth_m - hypo_depth)/2 + hypo_depth,
+         hypo_strata = ifelse(Depth_m < breakpoint, "upper", "lower")) %>%
+  group_by(LakeID, Year, hypo_strata, SurfaceArea_ha) %>%
+  summarize(Area_m2 = max(Area_m2))
 
-empirical_strat_end <- full_with_thermo%>%
-  full_join(lake_bats, by = c("LakeID","Depth_m"))%>%
-  filter(!is.na(IntervalVolume_m3))%>%
-  filter(Depth_m > hypo_depth)%>%
-  mutate(DO_mass = DO_mgL*IntervalVolume_m3,
-         Temp_total = Temp_C*IntervalVolume_m3,
-         Year = year(Date))%>%
-  group_by(Date, LakeID)%>%
-  dplyr::summarize(DO_tot = sum(DO_mass),#sum across all hypolimnetic depths
-                   vol_tot = sum(IntervalVolume_m3),
-                   DO_mgL_vol = DO_tot/vol_tot, #Divide by hypolimnetic volume
-                   mixing_date = unique(Date_end)) %>%
-  mutate(Year= year(Date))%>%
-  group_by(LakeID, Year)%>%
-  filter(Date == last(Date[Date <= as.Date(mixing_date)])) %>%
-  mutate(strat_interval = as.numeric(as.Date(mixing_date) - Date),
-         mixing_date = yday(mixing_date)) %>%
-  filter(strat_interval <= PROXIMITY) %>%
-  select(LakeID, Year, mixing_date)
-```
-
-Plot results
-```{r}
-anoxic_on_off = vw_do_demand_qaqc %>%
-  select(Year, LakeID, anoxic_onset) %>%
+AF_two_layer <- vw_do_demand_qaqc %>%
+  dplyr::select(Year, LakeID, anoxic_onset, hypo_strata) %>%
   rename(anoxic_onset_vhod = anoxic_onset) %>%
   full_join(empirical_anoxic_onset) %>%
-  full_join(empirical_anoxic_end) %>%
-  full_join(empirical_strat_end) %>%
-  full_join(strat_end %>% select(LakeID, Year, strat_end_model))
-
-anoxic_on_off %>%
-  filter(!is.na(anoxic_onset_data)) %>%
-  ggplot(aes(x = anoxic_onset_data, y = anoxic_onset_vhod))+
-  geom_abline(slope = 1)+
-  geom_smooth(method = "lm")+
-  geom_point()
-
-anoxic_on_off %>%
-  filter(!is.na(anoxic_end_data)) %>%
-  ggplot(aes(x = anoxic_end_data, y = mixing_date))+
-  geom_abline(slope = 1)+
-  geom_smooth(method = "lm")+
-  geom_point()
-
-anoxic_on_off %>%
-  filter(!is.na(anoxic_end_data)) %>%
-  ggplot(aes(x = anoxic_end_data, y = strat_end_model))+
-  geom_abline(slope = 1)+
-  geom_smooth(method = "lm")+
-  geom_point()
-
-anoxic_on_off %>%
-  filter(!is.na(anoxic_end_data)) %>%
-  ggplot(aes(x = mixing_date, y = strat_end_model))+
-  geom_abline(slope = 1)+
-  geom_smooth(method = "lm")+
-  geom_point()
-```
-
-
-Step 6: Calculate AF, combining all info
-```{r}
-lake_bats <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/ba733454c29a5f026efed05a6e6ef75b")%>%
-  filter(Area_m2>0)%>%
-  group_by(LakeID)%>%
-  mutate(methods_n = length(unique(Method)))%>%
-  filter(methods_n==1|Method=="model")%>%
-  ungroup()
-
-areas = full_with_thermo %>%
-  group_by(LakeID, Year) %>%
-  summarize(hypo_depth = round(mean(hypo_depth)),
-            SurfaceArea_ha = unique(SurfaceArea_ha)) %>%
-  left_join(lake_bats%>% select(LakeID, Depth_m, Area_m2), by = c("LakeID",hypo_depth = "Depth_m"))
-
-AF = anoxic_on_off %>%
+  full_join(new_strat_end_model) %>%
+  left_join(breaks) %>%
   mutate(anoxic_onset = ifelse(!is.na(anoxic_onset_data),
                                anoxic_onset_data,
                                anoxic_onset_vhod),
-         anoxic_end = strat_end_model,
+         anoxic_end = strat_end_new_model,
          duration = anoxic_end - anoxic_onset) %>%
-  left_join(areas) %>%
-  mutate(AF = duration*Area_m2/(SurfaceArea_ha*10000),
-         AF = ifelse(AF < 0, 0, AF))
-```
-
-
-Step 6: If VW DO is above threshold all summer and sampling is done in late summer, AF = 0 (filling in lakes where we couldn't use oxygen demand)
-```{r}
-summer <- read_csv("../Compiled data/summer_averages_wi.csv")
-summer_af <- summer %>%
-  group_by(LakeID, Year) %>%
-  filter(Layer == "HYPO",
-         DO_mgL > 5) %>%
-  mutate(AF_summer = 0) %>%
-  select(LakeID, Year, AF_summer)
-  
-AF_output <- AF %>%
-  dplyr::select(LakeID, Year, AF) %>%
-  full_join(summer_af) %>%
-  mutate(AF = ifelse(is.na(AF), AF_summer, AF)) %>%
+  filter(!is.na(duration)) %>%
+  dplyr::select(LakeID, Year, hypo_strata, Area_m2, duration, SurfaceArea_ha) %>%
+  pivot_wider(names_from = hypo_strata, values_from = c(duration, Area_m2)) %>%
+  filter(!is.na(duration_lower) & !is.na(duration_upper)) %>%
+  mutate(duration_lower = ifelse(duration_lower < 0, 0, duration_lower),
+         duration_upper = ifelse(duration_upper < 0, 0, duration_upper),
+         duration_lower = duration_lower - duration_upper,
+         AF_lower = duration_lower * Area_m2_lower / (SurfaceArea_ha*10000),
+         AF_upper = duration_upper * Area_m2_upper / (SurfaceArea_ha*10000),
+         AF = AF_lower + AF_upper) %>%
   dplyr::select(LakeID, Year, AF) %>%
   filter(!is.na(AF))
-
-unique(AF_output$LakeID)
-
-write.csv(AF, "../Compiled data/AF.csv", row.names = F)
+  
+write.csv(AF_two_layer, "../Compiled data/AF - two layers.csv", row.names = F)
 ```

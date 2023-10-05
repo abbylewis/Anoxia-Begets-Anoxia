@@ -179,24 +179,33 @@ empirical_strat_end <- full_with_thermo%>%
          mixing_date = yday(mixing_date) - (strat_interval/2)) %>%
   filter(strat_interval <= PROXIMITY) %>%
   select(LakeID, Year, mixing_date)
+```
 
+Develop new model that includes year
+```{r}
 for_new_model <- annual_data %>%
-  full_join(empirical_strat_end)
+  dplyr::select(-mixing_date) %>%
+  full_join(empirical_strat_end) %>%
+  dplyr::select(mixing_date, strat_Temp_C_HYPO, MeanDepth_m, Latitude_DD, Year) %>%
+  drop_na()
 
-new_model <- lm(log10(annual_data$mixing_date) ~ log10(annual_data$strat_Temp_C_HYPO) +
-     log10(annual_data$MeanDepth_m) +
-     annual_data$Latitude_DD +
-     annual_data$Year)
+new_model <- lm(log10(for_new_model$mixing_date) ~ log10(for_new_model$strat_Temp_C_HYPO) +
+     log10(for_new_model$MeanDepth_m) +
+     for_new_model$Latitude_DD +
+     for_new_model$Year)
 
 summary(new_model)
 
-new_strat_end_model <- annual_data%>%
+new_strat_end_model <- annual_data %>%
   mutate(strat_end_new_model = 10^(new_model$coefficients[1] + 
                                  (new_model$coefficients[2] * log10(strat_Temp_C_HYPO)) + 
                                  (new_model$coefficients[3] * log10(MeanDepth_m)) + 
                                  (new_model$coefficients[4] * Latitude_DD) +
                                  (new_model$coefficients[5] * Year)
-                                 )) 
+                                 )) %>%
+  dplyr::select(LakeID, Year, strat_end_new_model) %>%
+  unique()
+
 ```
 
 Plot results
@@ -305,4 +314,14 @@ AF_output <- AF %>%
 unique(AF_output$LakeID)
 
 write.csv(AF, "../Compiled data/AF.csv", row.names = F)
+
+AF_output %>%
+  rename(AF_one = AF) %>%
+  full_join(AF_two_layer) %>%
+  ggplot(aes(x = AF_one, y = AF)) +
+  geom_point()+ 
+  geom_abline(slope = 1, color = "red")
+
+anoxic_on_off %>%
+  filter(LakeID=="205")
 ```
