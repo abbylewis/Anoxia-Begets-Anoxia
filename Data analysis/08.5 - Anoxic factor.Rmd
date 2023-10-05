@@ -21,6 +21,7 @@ full_with_thermo <- read.csv("../Compiled data/Stratified_period_data_with_therm
   mutate(Date=as.Date(Date))
 #Load lake metadata
 lat_long <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/fadd3eaa25b5fdd1fc4efba70e660579")
+annual_data <- read.csv("../Compiled data/All_data_annual.csv")
 ```
 
 
@@ -32,7 +33,7 @@ lake_bats <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/b
   filter(Area_m2>0)%>%
   group_by(LakeID)%>%
   mutate(methods_n = length(unique(Method)))%>%
-  filter(methods_n==1|Method=="model")%>%
+  filter(methods_n==1|Method=="data")%>%
   ungroup()
 
 #Check bathymetric data availability
@@ -72,11 +73,12 @@ length(unique(vw_do$LakeID)) #581 lakes left
 
 Step 3: Model end of stratification date
 ```{r}
-strat_end <- read.csv("../Compiled data/All_data_annual.csv")%>%
-  mutate(strat_end_model = 10^(2.62 - 
-                           (0.116 * log10(strat_Temp_C_HYPO)) + 
-                           (0.042 * log10(MeanDepth_m)) - 
-                           (0.002 * Latitude_DD))) 
+strat_end <- annual_data %>%
+  mutate(strat_end_model = 10^(2.62 + 
+                           (-0.116 * log10(strat_Temp_C_HYPO)) + 
+                           (0.042 * log10(MeanDepth_m)) + 
+                           (-0.002 * Latitude_DD)),
+         strat_end_model_corrected = strat_end_model + 2.5/10 * (Year - 1988)) #correction from Jane et al. 2023
 
 strat_end %>%
   ggplot(aes(x = strat_end_model))+
@@ -86,7 +88,7 @@ strat_end %>%
 Step 4: Model start of anoxia date using oxygen demand
 ```{r}
 #Calculate the rate of change in volume-weighted concentrations using lm
-DO_THRESH = 1
+DO_THRESH = 1.7
 
 vw_do_demand <- vw_do%>%
   mutate(Year = year(Date),
@@ -94,12 +96,7 @@ vw_do_demand <- vw_do%>%
   group_by(Year, LakeID)%>%
   dplyr::summarize(n = n(),
             DO_demand_mgLd = -lm(DO_mgL_vol~DOY)$coefficients[2],
-            AHOD_mgLd = -lm(DO_mgL_area~DOY)$coefficients[2],
-            p_vol = summary(lm(DO_mgL_vol~DOY))$coefficients[8],
-            p_area = summary(lm(DO_mgL_area~DOY))$coefficients[8],
             r2_vol = summary(lm(DO_mgL_vol~DOY))$r.squared,
-            r2_area = summary(lm(DO_mgL_area~DOY))$r.squared,
-            Temp_C = mean(Temp_C, na.rm = T),
             anoxic_onset = (DO_THRESH - lm(DO_mgL_vol~DOY)$coefficients[1]) / 
               lm(DO_mgL_vol~DOY)$coefficients[2])%>%
   filter(n>=3)#Need at least 3 points
@@ -173,34 +170,45 @@ empirical_anoxic_end <- full_with_thermo%>%
 
 empirical_strat_end <- full_with_thermo%>%
   full_join(lake_bats, by = c("LakeID","Depth_m"))%>%
-  filter(!is.na(IntervalVolume_m3))%>%
-  filter(Depth_m > hypo_depth)%>%
-  mutate(DO_mass = DO_mgL*IntervalVolume_m3,
-         Temp_total = Temp_C*IntervalVolume_m3,
-         Year = year(Date))%>%
   group_by(Date, LakeID)%>%
-  dplyr::summarize(DO_tot = sum(DO_mass),#sum across all hypolimnetic depths
-                   vol_tot = sum(IntervalVolume_m3),
-                   DO_mgL_vol = DO_tot/vol_tot, #Divide by hypolimnetic volume
-                   mixing_date = unique(Date_end)) %>%
+  dplyr::summarize(mixing_date = unique(Date_end)) %>%
   mutate(Year= year(Date))%>%
   group_by(LakeID, Year)%>%
   filter(Date == last(Date[Date <= as.Date(mixing_date)])) %>%
   mutate(strat_interval = as.numeric(as.Date(mixing_date) - Date),
-         mixing_date = yday(mixing_date)) %>%
+         mixing_date = yday(mixing_date) - (strat_interval/2)) %>%
   filter(strat_interval <= PROXIMITY) %>%
   select(LakeID, Year, mixing_date)
+
+for_new_model <- annual_data %>%
+  full_join(empirical_strat_end)
+
+new_model <- lm(log10(annual_data$mixing_date) ~ log10(annual_data$strat_Temp_C_HYPO) +
+     log10(annual_data$MeanDepth_m) +
+     annual_data$Latitude_DD +
+     annual_data$Year)
+
+summary(new_model)
+
+new_strat_end_model <- annual_data%>%
+  mutate(strat_end_new_model = 10^(new_model$coefficients[1] + 
+                                 (new_model$coefficients[2] * log10(strat_Temp_C_HYPO)) + 
+                                 (new_model$coefficients[3] * log10(MeanDepth_m)) + 
+                                 (new_model$coefficients[4] * Latitude_DD) +
+                                 (new_model$coefficients[5] * Year)
+                                 )) 
 ```
 
 Plot results
 ```{r}
 anoxic_on_off = vw_do_demand_qaqc %>%
-  select(Year, LakeID, anoxic_onset) %>%
+  dplyr::select(Year, LakeID, anoxic_onset) %>%
   rename(anoxic_onset_vhod = anoxic_onset) %>%
   full_join(empirical_anoxic_onset) %>%
   full_join(empirical_anoxic_end) %>%
   full_join(empirical_strat_end) %>%
-  full_join(strat_end %>% select(LakeID, Year, strat_end_model))
+  full_join(new_strat_end_model) %>%
+  full_join(strat_end %>% dplyr::select(LakeID, Year, strat_end_model, strat_end_model_corrected))
 
 anoxic_on_off %>%
   filter(!is.na(anoxic_onset_data)) %>%
@@ -224,11 +232,29 @@ anoxic_on_off %>%
   geom_point()
 
 anoxic_on_off %>%
-  filter(!is.na(anoxic_end_data)) %>%
+  filter(!is.na(mixing_date)) %>%
   ggplot(aes(x = mixing_date, y = strat_end_model))+
   geom_abline(slope = 1)+
   geom_smooth(method = "lm")+
   geom_point()
+
+anoxic_on_off %>%
+  filter(!is.na(mixing_date)) %>%
+  ggplot(aes(x = mixing_date, y = strat_end_model_corrected))+
+  geom_abline(slope = 1)+
+  geom_smooth(method = "lm")+
+  geom_point()
+
+anoxic_on_off %>%
+  filter(!is.na(mixing_date)) %>%
+  ggplot(aes(x = mixing_date, y = strat_end_new_model))+
+  geom_abline(slope = 1)+
+  geom_smooth(method = "lm")+
+  geom_point()
+
+summary(lm(anoxic_on_off$mixing_date ~ anoxic_on_off$strat_end_model))
+summary(lm(anoxic_on_off$mixing_date ~ anoxic_on_off$strat_end_model_corrected))
+summary(lm(anoxic_on_off$mixing_date ~ anoxic_on_off$strat_end_new_model))
 ```
 
 
@@ -238,7 +264,7 @@ lake_bats <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/b
   filter(Area_m2>0)%>%
   group_by(LakeID)%>%
   mutate(methods_n = length(unique(Method)))%>%
-  filter(methods_n==1|Method=="model")%>%
+  filter(methods_n==1|Method=="data")%>%
   ungroup()
 
 areas = full_with_thermo %>%
@@ -251,7 +277,7 @@ AF = anoxic_on_off %>%
   mutate(anoxic_onset = ifelse(!is.na(anoxic_onset_data),
                                anoxic_onset_data,
                                anoxic_onset_vhod),
-         anoxic_end = strat_end_model,
+         anoxic_end = strat_end_new_model,
          duration = anoxic_end - anoxic_onset) %>%
   left_join(areas) %>%
   mutate(AF = duration*Area_m2/(SurfaceArea_ha*10000),
