@@ -79,6 +79,7 @@ renamer = function(text_vect){
     if(text=="TN_ugL_EPI")         output[i]="Epi. TN"
     if(text=="DO_date_HYPO")       output[i]="Oxygen measurement\ndate (lake-year mean)"
     if(text=="SA_vol_ratio_HYPO")  output[i]="Hypo. surface area\nto volume ratio"
+    if(text=="AF")                 output[i]="Anoxic factor"
     i = i+1
   }
   return(output)

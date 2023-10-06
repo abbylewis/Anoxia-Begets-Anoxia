@@ -181,7 +181,10 @@ vif(mod_lmer)
 confint(mod_lmer)
 summary(mod_lmer)
 plot_effects_lmer(mod_lmer,"Temperature-corrected oxygen demand") 
+
+jpeg("../Figures/MLR-lmer/Parameter estimate-Temperature-corrected oxygen demand-all_lakes-ridge wide.jpg", width = 4.5, height = 4, res = 300, units = "in")
 plot_effects_by_lake_lmer_ridge(all_lakes_vhod5,"Temperature-corrected oxygen demand",mod_lmer)
+dev.off()
 
 ### Epi. TP
 responses <- c("strat_TP_ugL_EPI")
@@ -613,7 +616,7 @@ layout <- rbind(c(1, 4),
                 c(3, NA),
                 c(3, NA),
                 c(3, NA))
-jpeg("../Figures/MLR-lmer/Parameter estimate-all-custom layout-AF.jpeg", width = 7, height = 6.5, res = 300, units = "in")
+jpeg("../Figures/MLR-lmer/Parameter estimate-all-custom layout-AF.jpeg", width = 7, height = 6, res = 300, units = "in")
 grid.arrange(g1,g2,g3,g4,g5,layout_matrix=layout)
 dev.off()
 
@@ -665,7 +668,7 @@ layout <- rbind(c(1, 2),
                 c(3, 2),
                 c(3, 2),
                 c(3, 2),
-                c(3, 5),
+                c(3, 2),
                 c(4, 5),
                 c(4, 5),
                 c(4, 5),
@@ -675,7 +678,7 @@ layout <- rbind(c(1, 2),
                 c(4, 5),
                 c(4, 5),
                 c(4, 5),
-                c(4, NA),
+                c(4, 5),
                 c(4, NA))
 jpeg("../Figures/MLR-lmer/Parameter estimate-all-ridge-af.jpeg", width = 6, height = 5.5, res = 300, units = "in")
 grid.arrange(g1,g2,g3,g4,g5, layout_matrix=layout)

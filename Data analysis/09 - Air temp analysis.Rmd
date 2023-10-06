@@ -229,7 +229,7 @@ cld_df <- data.frame(cld = cld, mon = names(cld))%>%
   mutate(mon = factor(as.numeric(mon), levels = c(9:12,1:8), labels = labs))
 
 
-jpeg("../Figures/AF and temp by month.jpg", width = 6, height = 4, res = 300, units = "in")
+jpeg("../Figures/AF and temp by month.jpg", width = 6, height = 3, res = 300, units = "in")
 do_temp_data <- many_lake_stat%>%
   group_by(mon)%>%
   mutate(p = wilcox.test(do_temp)$p.value,

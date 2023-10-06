@@ -36,13 +36,6 @@ lake_bats <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/b
   filter(methods_n==1|Method=="data")%>%
   ungroup()
 
-#Check bathymetric data availability
-unique(lake_bats$LakeID)[!unique(lake_bats$LakeID)%in%unique(lat_long$LakeID)]
-unique(lat_long$LakeID)[!unique(lat_long$LakeID)%in%unique(lake_bats$LakeID)] #missing full bathymetry for 37 lakes
-
-#Total n to start: 609
-length(unique(full_with_thermo$LakeID))
-
 #Calculate volume-weighted oxygen concentrations
 vw_do <- full_with_thermo%>%
   full_join(lake_bats, by = c("LakeID","Depth_m"))%>%
@@ -67,8 +60,6 @@ vw_do <- full_with_thermo%>%
   filter(is.na(low_point)|Date<=low_point)%>% #Remove days after the lowest DO value
   ungroup()%>%
   mutate(Year = year(Date))
-
-length(unique(vw_do$LakeID)) #581 lakes left
 ```
 
 Step 3: Model end of stratification date
@@ -79,10 +70,6 @@ strat_end <- annual_data %>%
                            (0.042 * log10(MeanDepth_m)) + 
                            (-0.002 * Latitude_DD)),
          strat_end_model_corrected = strat_end_model + 2.5/10 * (Year - 1988)) #correction from Jane et al. 2023
-
-strat_end %>%
-  ggplot(aes(x = strat_end_model))+
-  geom_histogram()
 ```
 
 Step 4: Model start of anoxia date using oxygen demand
@@ -122,10 +109,6 @@ good_hod <- vw_do_demand%>%
 
 vw_do_demand_qaqc <- removed_by_pos%>%
   filter(LakeID %in% good_hod$LakeID)
-
-vw_do_demand_qaqc %>%
-  ggplot(aes(x = anoxic_onset))+
-  geom_histogram()
 ```
 
 Step 5: Empirically calculate start and end of anoxia date if it can be determined within a certain range (PROXIMITY)
@@ -143,30 +126,6 @@ empirical_anoxic_onset <- vw_do %>%
          fraction = (DO_mgL_vol[Date==before] - DO_THRESH) / range)%>%
   filter(interval <= PROXIMITY) %>%
   summarize(anoxic_onset_data = unique(yday(before) + fraction * interval))
-
-empirical_anoxic_end <- full_with_thermo%>%
-  full_join(lake_bats, by = c("LakeID","Depth_m"))%>%
-  filter(!is.na(IntervalVolume_m3))%>%
-  filter(Depth_m > hypo_depth)%>%
-  mutate(DO_mass = DO_mgL*IntervalVolume_m3,
-         Temp_total = Temp_C*IntervalVolume_m3,
-         Year = year(Date))%>%
-  group_by(Date, LakeID)%>%
-  dplyr::summarize(DO_tot = sum(DO_mass),#sum across all hypolimnetic depths
-                   vol_tot = sum(IntervalVolume_m3),
-                   DO_mgL_vol = DO_tot/vol_tot) %>%#Divide by hypolimnetic volume
-  mutate(Year= year(Date))%>%
-  group_by(LakeID, Year)%>%
-  filter(!is.na(DO_mgL_vol),
-         sum(DO_mgL_vol < DO_THRESH, na.rm = T) >= 1,
-         sum(DO_mgL_vol > DO_THRESH, na.rm = T) >= 1) %>%
-  mutate(last = last(Date[DO_mgL_vol < DO_THRESH]),
-         after = first(Date[Date > last]),
-         interval = as.numeric(after - last),
-         range = DO_mgL_vol[Date == after] - DO_mgL_vol[Date ==  last],
-         fraction = (DO_mgL_vol[Date == after] - DO_THRESH) / range)%>%
-  filter(interval <= PROXIMITY) %>%
-  summarize(anoxic_end_data = unique(yday(after) - (fraction * interval)))
 
 empirical_strat_end <- full_with_thermo%>%
   full_join(lake_bats, by = c("LakeID","Depth_m"))%>%
@@ -186,15 +145,15 @@ Develop new model that includes year
 for_new_model <- annual_data %>%
   dplyr::select(-mixing_date) %>%
   full_join(empirical_strat_end) %>%
-  dplyr::select(mixing_date, strat_Temp_C_HYPO, MeanDepth_m, Latitude_DD, Year) %>%
+  dplyr::select(mixing_date, strat_Temp_C_HYPO, MeanDepth_m, Latitude_DD, Year, LakeID) %>%
   drop_na()
+
+length(unique(for_new_model$LakeID))
 
 new_model <- lm(log10(for_new_model$mixing_date) ~ log10(for_new_model$strat_Temp_C_HYPO) +
      log10(for_new_model$MeanDepth_m) +
      for_new_model$Latitude_DD +
      for_new_model$Year)
-
-summary(new_model)
 
 new_strat_end_model <- annual_data %>%
   mutate(strat_end_new_model = 10^(new_model$coefficients[1] + 
@@ -205,7 +164,6 @@ new_strat_end_model <- annual_data %>%
                                  )) %>%
   dplyr::select(LakeID, Year, strat_end_new_model) %>%
   unique()
-
 ```
 
 Plot results
@@ -214,55 +172,53 @@ anoxic_on_off = vw_do_demand_qaqc %>%
   dplyr::select(Year, LakeID, anoxic_onset) %>%
   rename(anoxic_onset_vhod = anoxic_onset) %>%
   full_join(empirical_anoxic_onset) %>%
-  full_join(empirical_anoxic_end) %>%
   full_join(empirical_strat_end) %>%
   full_join(new_strat_end_model) %>%
   full_join(strat_end %>% dplyr::select(LakeID, Year, strat_end_model, strat_end_model_corrected))
 
+jpeg("../Figures/Anoxic onset comparison.jpg", width = 3.75, height = 3.5, res = 300, units = "in")
 anoxic_on_off %>%
-  filter(!is.na(anoxic_onset_data)) %>%
+  filter(!is.na(anoxic_onset_data),
+         !is.na(anoxic_onset_vhod)) %>%
   ggplot(aes(x = anoxic_onset_data, y = anoxic_onset_vhod))+
   geom_abline(slope = 1)+
-  geom_smooth(method = "lm")+
-  geom_point()
+  geom_smooth(method = "lm", formula = y~x)+
+  geom_point()+
+  theme_bw()+
+  xlab("Anoxic onset (between profiles)") + 
+  ylab("Anoxic onset (VHOD)")+
+  stat_regline_equation(aes(label =  paste(after_stat(eq.label), after_stat(adj.rr.label), sep = "~~~~~~~")))
+dev.off()
 
-anoxic_on_off %>%
-  filter(!is.na(anoxic_end_data)) %>%
-  ggplot(aes(x = anoxic_end_data, y = mixing_date))+
-  geom_abline(slope = 1)+
-  geom_smooth(method = "lm")+
-  geom_point()
+library(ggpubr)
 
-anoxic_on_off %>%
-  filter(!is.na(anoxic_end_data)) %>%
-  ggplot(aes(x = anoxic_end_data, y = strat_end_model))+
-  geom_abline(slope = 1)+
-  geom_smooth(method = "lm")+
-  geom_point()
-
-anoxic_on_off %>%
+p1 <- anoxic_on_off %>%
   filter(!is.na(mixing_date)) %>%
   ggplot(aes(x = mixing_date, y = strat_end_model))+
   geom_abline(slope = 1)+
   geom_smooth(method = "lm")+
-  geom_point()
+  geom_point()+
+  xlab("Stratification end (between profiles)") + 
+  ylab("Stratification end (Nürnberg 1988)")+
+  theme_bw()+
+  stat_regline_equation(aes(label =  paste(after_stat(eq.label), after_stat(adj.rr.label), sep = "~~~~~~~")))
 
-anoxic_on_off %>%
-  filter(!is.na(mixing_date)) %>%
-  ggplot(aes(x = mixing_date, y = strat_end_model_corrected))+
-  geom_abline(slope = 1)+
-  geom_smooth(method = "lm")+
-  geom_point()
-
-anoxic_on_off %>%
+p2 <- anoxic_on_off %>%
   filter(!is.na(mixing_date)) %>%
   ggplot(aes(x = mixing_date, y = strat_end_new_model))+
   geom_abline(slope = 1)+
   geom_smooth(method = "lm")+
-  geom_point()
+  geom_point()+
+  xlab("Stratification end (between profiles)") + 
+  ylab("Stratification end (modified model)")+
+  theme_bw()+
+  stat_regline_equation(aes(label =  paste(after_stat(eq.label), after_stat(adj.rr.label), sep = "~~~~~~~")))
+
+jpeg("../Figures/Strat end comparison.jpg", width = 6.5, height = 3.5, res = 300, units = "in")
+ggarrange(p1,p2)
+dev.off()
 
 summary(lm(anoxic_on_off$mixing_date ~ anoxic_on_off$strat_end_model))
-summary(lm(anoxic_on_off$mixing_date ~ anoxic_on_off$strat_end_model_corrected))
 summary(lm(anoxic_on_off$mixing_date ~ anoxic_on_off$strat_end_new_model))
 ```
 
@@ -315,13 +271,27 @@ unique(AF_output$LakeID)
 
 write.csv(AF, "../Compiled data/AF.csv", row.names = F)
 
+AF_two_layer <- read_csv("../Compiled data/AF - two layers.csv")
+nrow(AF_two_layer%>%filter(!is.na(AF)))
+length(unique(AF_two_layer$LakeID[!is.na(AF_two_layer$AF)]))
+nrow(AF%>%filter(!is.na(AF)))
+length(unique(AF$LakeID[!is.na(AF$AF)]))
+
+jpeg("../Figures/Two AF methods.jpg", width = 3.75, height = 3.5, res = 300, units = "in")
 AF_output %>%
   rename(AF_one = AF) %>%
   full_join(AF_two_layer) %>%
   ggplot(aes(x = AF_one, y = AF)) +
   geom_point()+ 
-  geom_abline(slope = 1, color = "red")
+  xlab("Anoxic factor (one layer)")+
+  ylab("Anoxic factor (two layer)")+
+  geom_abline(slope = 1)+
+  geom_smooth(method = "lm")+
+  theme_bw()+
+  stat_regline_equation(aes(label =  paste(after_stat(eq.label), 
+                                           after_stat(adj.rr.label), 
+                                           sep = "~~~~~~~")))
+dev.off()
 
-anoxic_on_off %>%
-  filter(LakeID=="205")
+
 ```
