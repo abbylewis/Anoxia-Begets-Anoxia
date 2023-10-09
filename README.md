@@ -39,13 +39,17 @@ All data analysis scripts:
     * Combine late-summer and stratified means with oxygen demand, and climate data. Output a file for following analyses.
 * `08 - Data characterization.Rmd`
     * Characterize the full, synthesized dataset. Output summary figures
-* `09 - Air temp analysis.Rmd`
+* `09 - Anoxic factor.Rmd`
+    * Characterize the full, synthesized dataset. Output summary figures
+* `10 - Anoxic factor layers.Rmd`
+    * Characterize the full, synthesized dataset. Output summary figures
+* `11 - Air temp analysis.Rmd`
     * Analyze the effects of changing monthly air temperatures on hypolimnetic temperature and oxygen dynamics
-* `10 - Lags.Rmd`
+* `12 - Lags.Rmd`
     * Analyze the relevant lags for each relationship in the anoxia-begets-anoxia (ABA) feedback
-* `11 - Regressions.Rmd`
+* `13 - Regressions.Rmd`
     * Perform regression analyses within and across lakes to characterize the ABA feedback. Functions for this analysis are in `lmer_functions.R`
-* `12 - Depth cutoff of 3m.Rmd`
+* `14 - Depth cutoff of 3m.Rmd`
     * Re-run all analyses to generate Figure 3 using data from lakes ≥ 3 m, rather than ≥ 6.4 m
 
 ### ./External data

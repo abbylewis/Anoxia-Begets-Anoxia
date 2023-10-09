@@ -140,7 +140,6 @@ dev.off()
 ```
 
 
-
 Step 3: Analyze the effect of monthly air temperature on hypolimnetic DO, VHOD, and temp dynamics
 ```{r}
 many_lake_temp_sum <- with_temp%>%
