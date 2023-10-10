@@ -4,7 +4,7 @@
 
 An analysis of oxygen, phosphorus, and chlorophyll-a dynamics across >650 widespread stratified lakes
 
-<img src="https://github.com/abbylewis/Anoxia-Begets-Anoxia/assets/51751937/5df6c358-86c7-4ee0-8e0d-5aeb0eb6faf0" width = "600">
+![epi and hypo tp abstract](https://github.com/abbylewis/Anoxia-Begets-Anoxia/assets/51751937/11dce591-ca64-4486-86d0-3a74247bba1a)
 
 ## Keywords
 
