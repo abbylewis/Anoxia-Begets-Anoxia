@@ -5,7 +5,7 @@ date: "2022-08-29"
 output: html_document
 ---
 
-This file calculates anoxic factor for each lake year. 
+This file calculates anoxic factor for each lake-year, treating the entire hypolimnion as one layer. 
 
 Step 1: Load data and packages
 Step 2: Calculate VW DO
@@ -30,6 +30,7 @@ full_with_thermo <- read.csv("../Compiled data/Stratified_period_data_with_therm
   mutate(Date=as.Date(Date))
 #Load lake metadata
 lat_long <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/fadd3eaa25b5fdd1fc4efba70e660579")
+#Load compiled data
 annual_data <- read.csv("../Compiled data/All_data_annual.csv")
 ```
 
@@ -37,7 +38,6 @@ annual_data <- read.csv("../Compiled data/All_data_annual.csv")
 Step 2: Calculate VW DO
 ```{r}
 #prepare bathymetry
-#lake with only one method (data/model)
 lake_bats <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/ba733454c29a5f026efed05a6e6ef75b")%>%
   filter(Area_m2>0)%>%
   group_by(LakeID)%>%
@@ -74,6 +74,22 @@ vw_do <- full_with_thermo%>%
 
 Step 3: Model end of stratification date
 ```{r}
+# Calculate strat end if it can be determined within a certain range (PROXIMITY)
+PROXIMITY = 7
+
+empirical_strat_end <- full_with_thermo%>%
+  full_join(lake_bats, by = c("LakeID","Depth_m"))%>%
+  group_by(Date, LakeID)%>%
+  dplyr::summarize(mixing_date = unique(Date_end)) %>%
+  mutate(Year= year(Date))%>%
+  group_by(LakeID, Year)%>%
+  filter(Date == last(Date[Date <= as.Date(mixing_date)])) %>%
+  mutate(strat_interval = as.numeric(as.Date(mixing_date) - Date),
+         mixing_date = yday(mixing_date) - (strat_interval/2)) %>%
+  filter(strat_interval <= PROXIMITY) %>%
+  select(LakeID, Year, mixing_date)
+
+#Nürnberg model
 strat_end <- annual_data %>%
   mutate(strat_end_model = 10^(2.62 + 
                            (-0.116 * log10(strat_Temp_C_HYPO)) + 
@@ -83,7 +99,6 @@ strat_end <- annual_data %>%
 
 #New model incorporating year
 for_new_model <- annual_data %>%
-  dplyr::select(-mixing_date) %>%
   full_join(empirical_strat_end) %>%
   dplyr::select(mixing_date, strat_Temp_C_HYPO, MeanDepth_m, Latitude_DD, Year, LakeID) %>%
   drop_na()
@@ -95,6 +110,7 @@ new_model <- lm(log10(for_new_model$mixing_date) ~ log10(for_new_model$strat_Tem
      for_new_model$Latitude_DD +
      for_new_model$Year)
 
+#Generate predictions
 new_strat_end_model <- annual_data %>%
   mutate(strat_end_new_model = 10^(new_model$coefficients[1] + 
                                  (new_model$coefficients[2] * log10(strat_Temp_C_HYPO)) + 
@@ -162,18 +178,6 @@ empirical_anoxic_onset <- vw_do %>%
          fraction = (DO_mgL_vol[Date==before] - DO_THRESH) / range)%>%
   filter(interval <= PROXIMITY) %>%
   summarize(anoxic_onset_data = unique(yday(before) + fraction * interval))
-
-empirical_strat_end <- full_with_thermo%>%
-  full_join(lake_bats, by = c("LakeID","Depth_m"))%>%
-  group_by(Date, LakeID)%>%
-  dplyr::summarize(mixing_date = unique(Date_end)) %>%
-  mutate(Year= year(Date))%>%
-  group_by(LakeID, Year)%>%
-  filter(Date == last(Date[Date <= as.Date(mixing_date)])) %>%
-  mutate(strat_interval = as.numeric(as.Date(mixing_date) - Date),
-         mixing_date = yday(mixing_date) - (strat_interval/2)) %>%
-  filter(strat_interval <= PROXIMITY) %>%
-  select(LakeID, Year, mixing_date)
 ```
 
 
@@ -229,14 +233,16 @@ AF_output <- AF %>%
   dplyr::select(LakeID, Year, AF) %>%
   filter(!is.na(AF))
 
-unique(AF_output$LakeID)
+length(unique(AF_output$LakeID))
 ```
 
 
 Step 8: Export and plot
 ```{r}
+#Save results
 write.csv(AF, "../Compiled data/AF.csv", row.names = F)
 
+#Plot anoxic onset (data vs. VHOD)
 jpeg("../Figures/Anoxic onset comparison.jpg", width = 3.75, height = 3.5, res = 300, units = "in")
 anoxic_on_off %>%
   filter(!is.na(anoxic_onset_data),
@@ -251,8 +257,8 @@ anoxic_on_off %>%
   stat_regline_equation(aes(label =  paste(after_stat(eq.label), after_stat(adj.rr.label), sep = "~~~~~~~")))
 dev.off()
 
+#Plot mixing dates with multiple methods
 library(ggpubr)
-
 p1 <- anoxic_on_off %>%
   filter(!is.na(mixing_date)) %>%
   ggplot(aes(x = mixing_date, y = strat_end_model))+
@@ -279,30 +285,12 @@ jpeg("../Figures/Strat end comparison.jpg", width = 6.5, height = 3.5, res = 300
 ggarrange(p1,p2)
 dev.off()
 
+#Summary statistics
 summary(lm(anoxic_on_off$mixing_date ~ anoxic_on_off$strat_end_model))
 summary(lm(anoxic_on_off$mixing_date ~ anoxic_on_off$strat_end_new_model))
 
-AF_two_layer <- read_csv("../Compiled data/AF - two layers.csv")
-nrow(AF_two_layer%>%filter(!is.na(AF)))
-length(unique(AF_two_layer$LakeID[!is.na(AF_two_layer$AF)]))
-nrow(AF%>%filter(!is.na(AF)))
-length(unique(AF$LakeID[!is.na(AF$AF)]))
-
-jpeg("../Figures/Two AF methods.jpg", width = 3.75, height = 3.5, res = 300, units = "in")
-AF_output %>%
-  rename(AF_one = AF) %>%
-  full_join(AF_two_layer) %>%
-  ggplot(aes(x = AF_one, y = AF)) +
-  geom_point()+ 
-  xlab("Anoxic factor (one layer)")+
-  ylab("Anoxic factor (two layer)")+
-  geom_abline(slope = 1)+
-  geom_smooth(method = "lm")+
-  theme_bw()+
-  stat_regline_equation(aes(label =  paste(after_stat(eq.label), 
-                                           after_stat(adj.rr.label), 
-                                           sep = "~~~~~~~")))
-dev.off()
-
-
+#Add to compiled data
+with_temp_af <- annual_data %>%
+  left_join(AF)
+write.csv(with_temp_af,"../Compiled data/All_data_annual AF.csv",row.names =F)
 ```

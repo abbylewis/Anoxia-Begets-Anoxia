@@ -39,7 +39,7 @@ POSTER = F #Set global option: Should figures be designed for a poster or for th
 set.seed(47) #Set seed so points jitter the same way each time
 
 #Load saved data
-with_temp <- read.csv("../Compiled data/All_data_annual.csv")
+with_temp <- read.csv("../Compiled data/All_data_annual AF.csv")
 ```
 
 

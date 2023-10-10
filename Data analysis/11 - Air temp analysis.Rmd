@@ -27,7 +27,7 @@ library(viridis)
 library(MASS)
 
 #Load saved data
-with_temp = read.csv("../Compiled data/All_data_annual.csv")
+with_temp = read.csv("../Compiled data/All_data_annual AF.csv")
 ```
 
 

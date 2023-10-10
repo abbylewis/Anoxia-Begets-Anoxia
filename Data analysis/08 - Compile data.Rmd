@@ -138,12 +138,9 @@ precip_sum <- precip%>%
             Lat = unique(Lat),
             Lon = unique(Lon))
 
-AF <- read.csv("../Compiled data/AF.csv")
-
 with_temp_all <- summer_avgs_wide%>%
   left_join(climate_sum)%>%
-  left_join(precip_sum)%>%
-  left_join(AF)
+  left_join(precip_sum)
 
 #Lake 123 needs to be removed because it does not have the seasons we are studying in this analysis
 climate%>%
