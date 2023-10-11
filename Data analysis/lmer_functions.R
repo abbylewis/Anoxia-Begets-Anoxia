@@ -62,6 +62,7 @@ renamer = function(text_vect){
     if(text=="summer_temp")        output[i]="Summer air\ntemperature"
     if(text=="spring_temp")        output[i]="Spring air\ntemperature"
     if(text=="winter_temp")        output[i]="Winter air\ntemperature"
+    if(text=="fall_temp")          output[i]="Autumn air\ntemperature"
     if(text=="summer_precip")      output[i]="Summer\nprecipitation"
     if(text=="spring_precip")      output[i]="Spring\nprecipitation"
     if(text=="winter_precip")      output[i]="Winter\nprecipitation"

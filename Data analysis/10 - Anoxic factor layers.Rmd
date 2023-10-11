@@ -123,17 +123,17 @@ Develop new model that includes year
 ```{r}
 for_new_model <- annual_data %>%
   full_join(empirical_strat_end) %>%
-  dplyr::select(mixing_date, strat_Temp_C_HYPO, MeanDepth_m, Latitude_DD, Year, LakeID) %>%
+  dplyr::select(mixing_date, Temp_C_HYPO, MeanDepth_m, Latitude_DD, Year, LakeID) %>%
   drop_na()
 
-new_model <- lm(log10(for_new_model$mixing_date) ~ log10(for_new_model$strat_Temp_C_HYPO) +
+new_model <- lm(log10(for_new_model$mixing_date) ~ log10(for_new_model$Temp_C_HYPO) +
      log10(for_new_model$MeanDepth_m) +
      for_new_model$Latitude_DD +
      for_new_model$Year)
 
 new_strat_end_model <- annual_data %>%
   mutate(strat_end_new_model = 10^(new_model$coefficients[1] + 
-                                 (new_model$coefficients[2] * log10(strat_Temp_C_HYPO)) + 
+                                 (new_model$coefficients[2] * log10(Temp_C_HYPO)) + 
                                  (new_model$coefficients[3] * log10(MeanDepth_m)) + 
                                  (new_model$coefficients[4] * Latitude_DD) +
                                  (new_model$coefficients[5] * Year)
@@ -210,7 +210,7 @@ AF %>%
   rename(AF_one = AF) %>%
   full_join(AF_two_layer) %>%
   ggplot(aes(x = AF_one, y = AF)) +
-  geom_point()+ 
+  geom_point(alpha = 0.3)+ 
   xlab("Anoxic factor (one layer)")+
   ylab("Anoxic factor (two layer)")+
   geom_abline(slope = 1)+

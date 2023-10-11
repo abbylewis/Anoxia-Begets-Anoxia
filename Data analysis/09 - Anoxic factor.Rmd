@@ -92,7 +92,7 @@ empirical_strat_end <- full_with_thermo%>%
 #Nürnberg model
 strat_end <- annual_data %>%
   mutate(strat_end_model = 10^(2.62 + 
-                           (-0.116 * log10(strat_Temp_C_HYPO)) + 
+                           (-0.116 * log10(Temp_C_HYPO)) + 
                            (0.042 * log10(MeanDepth_m)) + 
                            (-0.002 * Latitude_DD)),
          strat_end_model_corrected = strat_end_model + 2.5/10 * (Year - 1988)) #correction from Jane et al. 2023
@@ -100,12 +100,12 @@ strat_end <- annual_data %>%
 #New model incorporating year
 for_new_model <- annual_data %>%
   full_join(empirical_strat_end) %>%
-  dplyr::select(mixing_date, strat_Temp_C_HYPO, MeanDepth_m, Latitude_DD, Year, LakeID) %>%
+  dplyr::select(mixing_date, Temp_C_HYPO, MeanDepth_m, Latitude_DD, Year, LakeID) %>%
   drop_na()
 
 length(unique(for_new_model$LakeID))
 
-new_model <- lm(log10(for_new_model$mixing_date) ~ log10(for_new_model$strat_Temp_C_HYPO) +
+new_model <- lm(log10(for_new_model$mixing_date) ~ log10(for_new_model$Temp_C_HYPO) +
      log10(for_new_model$MeanDepth_m) +
      for_new_model$Latitude_DD +
      for_new_model$Year)
@@ -113,7 +113,7 @@ new_model <- lm(log10(for_new_model$mixing_date) ~ log10(for_new_model$strat_Tem
 #Generate predictions
 new_strat_end_model <- annual_data %>%
   mutate(strat_end_new_model = 10^(new_model$coefficients[1] + 
-                                 (new_model$coefficients[2] * log10(strat_Temp_C_HYPO)) + 
+                                 (new_model$coefficients[2] * log10(Temp_C_HYPO)) + 
                                  (new_model$coefficients[3] * log10(MeanDepth_m)) + 
                                  (new_model$coefficients[4] * Latitude_DD) +
                                  (new_model$coefficients[5] * Year)
@@ -234,13 +234,14 @@ AF_output <- AF %>%
   filter(!is.na(AF))
 
 length(unique(AF_output$LakeID))
+nrow(AF_output)
 ```
 
 
 Step 8: Export and plot
 ```{r}
 #Save results
-write.csv(AF, "../Compiled data/AF.csv", row.names = F)
+write.csv(AF_output, "../Compiled data/AF.csv", row.names = F)
 
 #Plot anoxic onset (data vs. VHOD)
 jpeg("../Figures/Anoxic onset comparison.jpg", width = 3.75, height = 3.5, res = 300, units = "in")
@@ -260,7 +261,7 @@ dev.off()
 #Plot mixing dates with multiple methods
 library(ggpubr)
 p1 <- anoxic_on_off %>%
-  filter(!is.na(mixing_date)) %>%
+  filter(!is.na(mixing_date), !is.na(strat_end_model)) %>%
   ggplot(aes(x = mixing_date, y = strat_end_model))+
   geom_abline(slope = 1)+
   geom_smooth(method = "lm")+
@@ -271,7 +272,7 @@ p1 <- anoxic_on_off %>%
   stat_regline_equation(aes(label =  paste(after_stat(eq.label), after_stat(adj.rr.label), sep = "~~~~~~~")))
 
 p2 <- anoxic_on_off %>%
-  filter(!is.na(mixing_date)) %>%
+  filter(!is.na(mixing_date), !is.na(strat_end_new_model)) %>%
   ggplot(aes(x = mixing_date, y = strat_end_new_model))+
   geom_abline(slope = 1)+
   geom_smooth(method = "lm")+
@@ -291,6 +292,7 @@ summary(lm(anoxic_on_off$mixing_date ~ anoxic_on_off$strat_end_new_model))
 
 #Add to compiled data
 with_temp_af <- annual_data %>%
-  left_join(AF)
+  left_join(AF_output)
+
 write.csv(with_temp_af,"../Compiled data/All_data_annual AF.csv",row.names =F)
 ```

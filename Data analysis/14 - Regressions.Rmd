@@ -67,6 +67,7 @@ with_lags <- with_temp%>%
          summer_temp = (temp_july+temp_aug)/2,
          spring_temp = (temp_mar+temp_apr)/2,
          winter_temp = (temp_jan+temp_feb)/2,
+         fall_temp = (temp_sep+temp_oct)/2,
          summer_precip = (precip_july+precip_aug)/2,
          spring_precip = (precip_mar +precip_apr)/2,
          winter_precip = (precip_jan +precip_feb)/2,
@@ -148,16 +149,16 @@ hypo_do_oxic_ridge <- plot_effects_by_lake_lmer_ridge(all_lakes_do,"Hypolimnetic
 responses <- c("AF")
 potential_drivers <- c("DO_demand_mgLd_HYPO",
                       "spring_temp",
-                      "summer_temp",
+                      "fall_temp",
                       "winter_temp",
                       "Temp_C_HYPO"
                       )
 aic_calculator_lmer(dataset,responses,potential_drivers, interaction = "+")
 aic_calculator_lmer(data_no_oxic,responses,potential_drivers, interaction = "+") #same results
-selected_drivers <- c("DO_demand_mgLd_HYPO","spring_temp","Temp_C_HYPO")
+selected_drivers <- c("DO_demand_mgLd_HYPO","spring_temp","fall_temp","Temp_C_HYPO")
 std_data <- standardize_data(dataset,responses,selected_drivers) #all lakes for across-lake regression
 all_lakes_af <- mod_by_lake(data_no_oxic,responses,selected_drivers, interaction = "+") #only oxic lakes here
-mod_lmer <- lmer(AF~spring_temp+DO_demand_mgLd_HYPO+Temp_C_HYPO+(1|LakeID), data = std_data) 
+mod_lmer <- lmer(AF~spring_temp+DO_demand_mgLd_HYPO+Temp_C_HYPO+fall_temp+(1|LakeID), data = std_data) 
 mod_lmer
 vif(mod_lmer)
 af <- plot_effects_lmer(mod_lmer,"Anoxic factor", poster = POSTER) 
