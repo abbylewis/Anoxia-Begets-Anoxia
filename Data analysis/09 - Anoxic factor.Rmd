@@ -126,7 +126,7 @@ new_strat_end_model <- annual_data %>%
 Step 4: Model start of anoxia date using oxygen demand
 ```{r}
 #Calculate the rate of change in volume-weighted concentrations using lm
-DO_THRESH = 1.7
+DO_THRESH = 1.8
 
 vw_do_demand <- vw_do%>%
   mutate(Year = year(Date),

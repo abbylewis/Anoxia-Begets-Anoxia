@@ -64,6 +64,7 @@ with_lags <- with_temp%>%
          hypo_p_lag = lag(TP_ugL_HYPO),
          epi_n_lag = lag(TN_ugL_EPI),
          hypo_n_lag = lag(TN_ugL_HYPO),
+         AF_lag = lag(AF),
          summer_temp = (temp_july+temp_aug)/2,
          spring_temp = (temp_mar+temp_apr)/2,
          winter_temp = (temp_jan+temp_feb)/2,
@@ -73,7 +74,7 @@ with_lags <- with_temp%>%
          winter_precip = (precip_jan +precip_feb)/2,
          anoxic = max(DO_mgL_HYPO,na.rm = T)<1,
          lag_is_last_year = ifelse(lag(Year)==(Year-1),T,F))%>%
-  filter(lag_is_last_year)
+  mutate(across(contains("_lag"), function(x) ifelse(lag_is_last_year, x, NA)))
 
 # Save this as the dataset we will work with
 dataset <- with_lags
@@ -100,7 +101,7 @@ data_no_anoxic <- dataset%>%
 
 data_always_oxic <- dataset %>%
   filter(!is.finite(max(AF, na.rm = T)) || max(AF, na.rm = T) == 0,
-         !is.finite(min(DO_mgL_HYPO, na.rm = T)) || min(DO_mgL_HYPO, na.rm = T) > 1.7)
+         !is.finite(min(DO_mgL_HYPO, na.rm = T)) || min(DO_mgL_HYPO, na.rm = T) > 1.8)
 
 data_no_oxic <- dataset %>%
   filter(max(AF, na.rm = T) > 0)
@@ -137,10 +138,10 @@ potential_drivers <- c("DO_demand_mgLd_HYPO",
                       "DO_date_HYPO"
                       )
 aic_calculator_lmer(data_no_anoxic,responses,potential_drivers, interaction = "+")
-selected_drivers <- c("DO_demand_mgLd_HYPO", "spring_temp", "Temp_C_HYPO","DO_date_HYPO")
+selected_drivers <- c("DO_demand_mgLd_HYPO", "spring_temp", "DO_date_HYPO")
 std_data <- standardize_data(data_no_anoxic,responses,selected_drivers)
 all_lakes_do <- mod_by_lake(data_no_anoxic,responses,selected_drivers, interaction = "+")
-mod_lmer <- lmer(DO_mgL_HYPO~DO_demand_mgLd_HYPO+spring_temp+Temp_C_HYPO+DO_date_HYPO+(1|LakeID), data = std_data) 
+mod_lmer <- lmer(DO_mgL_HYPO~DO_demand_mgLd_HYPO+spring_temp+DO_date_HYPO+(1|LakeID), data = std_data) 
 vif(mod_lmer)
 hypo_do_oxic <- plot_effects_lmer(mod_lmer,"Hypolimnetic DO (oxic; mg/L)", poster = POSTER) 
 hypo_do_oxic_ridge <- plot_effects_by_lake_lmer_ridge(all_lakes_do,"Hypolimnetic DO (oxic; mg/L)",mod_lmer, poster = POSTER)
@@ -219,10 +220,10 @@ potential_drivers <- c("strat_TP_ugL_EPI",
                       "AF"
                       )
 aic_calculator_lmer(data_log_nuts,responses,potential_drivers, interaction = "+")
-selected_drivers <- c("strat_TP_ugL_EPI","AF")
+selected_drivers <- c("strat_TP_ugL_EPI","AF", "winter_precip")
 std_data <-standardize_data(data_log_nuts,responses,selected_drivers)
 all_lakes_hypoP_af <- mod_by_lake(data_log_nuts,responses,selected_drivers, interaction = "+")
-mod_lmer <- lmer(TP_ugL_HYPO~strat_TP_ugL_EPI+AF+(1|LakeID), data = std_data)
+mod_lmer <- lmer(TP_ugL_HYPO~strat_TP_ugL_EPI+AF+winter_precip+(1|LakeID), data = std_data)
 vif(mod_lmer)
 hypo_p_af <- plot_effects_lmer(mod_lmer,"Hypolimnetic TP (µg/L)", poster = POSTER) 
 hypo_p_ridge_af <- plot_effects_by_lake_lmer_ridge(all_lakes_hypoP_af,"Hypolimnetic TP (µg/L)",mod_lmer, poster = POSTER)
@@ -247,84 +248,6 @@ summary(mod_lmer)
 vif(mod_lmer)
 epi_chla <- plot_effects_lmer(mod_lmer,"Epilimnetic chl-a (µg/L)", poster = POSTER) 
 epi_chla_ridge <- plot_effects_by_lake_lmer_ridge(all_lakes_chla,"Epilimnetic chl-a (µg/L)",mod_lmer, poster = POSTER)
-```
-
-
-Segmented DO regression (could be cut?)
-```{r}
-### DO (rather than anoxic factor)
-responses <- c("DO_mgL_HYPO")
-potential_drivers <- c("DO_demand_mgLd_HYPO",
-                      "spring_temp",
-                      "summer_temp",
-                      "winter_temp",
-                      "Temp_C_HYPO",
-                      "DO_date_HYPO"
-                      )
-aic_calculator_lmer(data_no_anoxic,responses,potential_drivers, interaction = "+")
-selected_drivers <- c("DO_demand_mgLd_HYPO","spring_temp","Temp_C_HYPO","DO_date_HYPO")
-std_data <- standardize_data(data_no_anoxic,responses,selected_drivers)
-all_lakes_do <- mod_by_lake(data_no_anoxic,responses,selected_drivers, interaction = "+")
-mod_lmer <- lmer(DO_mgL_HYPO~spring_temp+DO_demand_mgLd_HYPO+Temp_C_HYPO+DO_date_HYPO+(1|LakeID), data = std_data) 
-vif(mod_lmer)
-hypo_do <- plot_effects_lmer(mod_lmer,"Hypolimnetic DO (mg/L)", poster = POSTER) 
-hypo_do_ridge <- plot_effects_by_lake_lmer_ridge(all_lakes_do,"Hypolimnetic DO (mg/L)",mod_lmer, poster = POSTER)
-#SEGMENTED
-std_data <- standardize_data(dataset,responses,selected_drivers) #Add in anoxic lakes here to make a point
-mod_seg <- lme(DO_mgL_HYPO~spring_temp+DO_demand_mgLd_HYPO+Temp_C_HYPO+DO_date_HYPO, random=~1|LakeID, data = std_data) #for some reason lmer doesn't work here
-seglme <- segmented.lme(mod_seg, random=list(LakeID=pdDiag(~1)), seg.Z = ~DO_demand_mgLd_HYPO, psi = 1)
-#G0 is the breakpoint, U is added to the coefficient for DO_demand_mgLd_HYPO to get the slope after the breakpoint
-#To "un-standardize" the breakpoint:
-dataset_filt <- dataset%>%
-  ungroup()%>%
-  dplyr::select(all_of(c(selected_drivers,responses,"LakeID")))%>%
-  filter(if_all(where(is.numeric),is.finite))
-mu_do <- mean(dataset_filt$DO_demand_mgLd_HYPO)
-sd_do <- sd(dataset_filt$DO_demand_mgLd_HYPO)
-break_untrans <- round(unique(seglme$fixed.eta.psi)*sd_do+mu_do,1)
-#To plot
-effects <- data.frame(seglme$lme.fit.noG$coefficients$fixed)
-colnames(effects) <- "Estimate"
-effects$Var <- row.names(effects)
-confs <- data.frame(t(confint(seglme)))
-confs$Var <- row.names(confs)
-effects2 <- effects%>%
-  left_join(confs)%>%
-  rename(xmin = X2.5.,
-         xmax = X97.5.)%>%
-  mutate(radius = Estimate-xmin,
-         radius2 = xmax-Estimate)
-effects2$Estimate[effects2$Var=="U"] <- 
-  effects2$Estimate[effects2$Var=="DO_demand_mgLd_HYPO"]+
-  effects2$Estimate[effects2$Var=="U"]
-effects2$xmin[effects2$Var=="U"] <- 
-  effects2$Estimate[effects2$Var=="U"]-
-  sqrt(effects2$radius[effects2$Var=="DO_demand_mgLd_HYPO"]^2+
-         effects2$radius[effects2$Var=="U"]^2)
-effects2$xmax[effects2$Var=="U"] <- 
-  effects2$Estimate[effects2$Var=="U"]+
-  sqrt(effects2$radius2[effects2$Var=="DO_demand_mgLd_HYPO"]^2+
-         effects2$radius2[effects2$Var=="U"]^2)
-
-if(POSTER){
-  effects2$Var[effects2$Var=="U"] <- paste0("VHOD\n(> ",break_untrans," mg/L/d)")
-  effects2$Var[effects2$Var=="DO_mgL_HYPO"] <- paste0("VHOD\n(< ",break_untrans," mg/L/d)")
-} else {
-  effects2$Var[effects2$Var=="U"] <- paste0("VHOD where\nVHOD > ",break_untrans," mg/L/d")
-  effects2$Var[effects2$Var=="DO_demand_mgLd_HYPO"] <- paste0("VHOD where\nVHOD < ",break_untrans," mg/L/d")
-}
-
-dataset%>%
-  ggplot(aes(x = DO_demand_mgLd_HYPO,y=DO_mgL_HYPO,color=anoxic))+
-  geom_point(alpha=0.2)+
-  geom_vline(xintercept = 0.1)+ #break_untrans
-  theme_bw()+
-  scale_color_manual(values = c("lightblue","red"), name = "Consistently anoxic")+
-  xlab("Oxygen demand (mg/L/d)")+
-  ylab("Late-summer oxygen (mg/L)")+
-  theme(legend.position = "bottom")
-ggsave(paste0("../Figures/DO_VHOD.jpeg"),
-       width = 4, height = 4, units = "in")
 ```
 
 
@@ -357,43 +280,7 @@ seglme <- segmented.lme(mod_seg, random=list(LakeID=pdDiag(~1)), seg.Z = ~DO_mgL
 #G0 is the breakpoint, U is added to the coefficient for DO_mgL_HYPO to get the slope after the breakpoint
 break_untrans <- round(unique(seglme$fixed.eta.psi),1)
 summary(seglme)
-#To plot
-effects <- data.frame(seglme$lme.fit.noG$coefficients$fixed)
-colnames(effects) <- "Estimate"
-effects$Var <- row.names(effects)
-confs <- data.frame(t(confint(seglme)))
-confs$Var <- row.names(confs)
-effects2 <- effects%>%
-  left_join(confs)%>%
-  rename(xmin = X2.5.,
-         xmax = X97.5.)%>%
-  mutate(radius = Estimate-xmin,
-         radius2 = xmax-Estimate)
-effects2$Estimate[effects2$Var=="U"] <- 
-  effects2$Estimate[effects2$Var=="DO_mgL_HYPO"]+
-  effects2$Estimate[effects2$Var=="U"]
-effects2$xmin[effects2$Var=="U"] <- 
-  effects2$Estimate[effects2$Var=="U"]-
-  sqrt(effects2$radius[effects2$Var=="DO_mgL_HYPO"]^2+
-         effects2$radius[effects2$Var=="U"]^2)
-effects2$xmax[effects2$Var=="U"] <- 
-  effects2$Estimate[effects2$Var=="U"]+
-  sqrt(effects2$radius2[effects2$Var=="DO_mgL_HYPO"]^2+
-         effects2$radius2[effects2$Var=="U"]^2)
-if(POSTER){
-  effects2$Var[effects2$Var=="U"] <- paste0("Bottom-water oxygen\n(> ",break_untrans," mg/L)")
-  effects2$Var[effects2$Var=="DO_mgL_HYPO"] <- paste0("Bottom-water oxygen\n(< ",break_untrans," mg/L)")
-} else {
-  effects2$Var[effects2$Var=="U"] <- paste0("Hypo. DO where\nDO > ",break_untrans," mg/L")
-  effects2$Var[effects2$Var=="DO_mgL_HYPO"] <- paste0("Hypo. DO where\nDO < ",break_untrans," mg/L")
-}
 
-status <- data_log_nuts%>%
-  group_by(LakeID)%>%
-  filter(!is.na(DO_mgL_HYPO))%>%
-  dplyr::summarize(status = ifelse(max(DO_mgL_HYPO,na.rm = T)<1, "Anoxic\n(max. DO < 1)",
-                                   ifelse(min(DO_mgL_HYPO, na.rm = T)<1,"Variable",
-                                          "Oxic\n(min. DO > 1)")))
 ```
 
 
@@ -756,6 +643,7 @@ for_mlr <- incomplete%>%
          log_Res_time= log(Res_time),
          log_epiP = log(mean_epi_p),
          log_hypoP = log(mean_hypo_p),
+         log_af = log(mean_af),
          SA_depth = log_SurfaceArea_ha/log_MaximumDepth_m,
          Lake_type = factor(Lake_type),
          tn_tp_ratio = mean_epi_n/mean_epi_p,
@@ -863,7 +751,7 @@ potential_drivers <- c("log_MeanDepth_m",
                       )
 responses <- c("DO_mgL_HYPO")
 aic_calculator_onevar(for_mlr,responses,potential_drivers)
-summary(lm(DO_mgL_HYPO~log_Res_time, data = for_mlr)) #Take home: nothing comes out cleanly
+summary(lm(DO_mgL_HYPO~mean_do, data = for_mlr)) #Take home: potentially a relationship with DO, but this is not part of the main ABA analysis (we use AF instead)
 
 potential_drivers <- c("log_MeanDepth_m",
                       "log_MaximumDepth_m",
@@ -871,29 +759,11 @@ potential_drivers <- c("log_MeanDepth_m",
                       "log_dynamic_ratio",
                       "log_Res_time",
                       "Elevation_m",
-                      "mean_af"
+                      "log_af"
                       )
 responses <- c("AF")
 aic_calculator_onevar(for_mlr,responses,potential_drivers)
-summary(lm(AF~mean_af, data = for_mlr)) #Take home: nothing comes out cleanly
-
-jpeg("../Figures/Effect of DO on TP.jpg", width = 4.5, height = 4, res = 300, units = "in")
-do <- for_mlr%>%
-  mutate(oxy_class = ifelse(min_do>1,"Oxic\n(min. DO > 1 mg/L)",ifelse(max_do<1,"Anoxic\n(max. DO < 1 mg/L)","Variable")),
-         oxy_class = factor(oxy_class, levels = c("Anoxic\n(max. DO < 1 mg/L)","Variable","Oxic\n(min. DO > 1 mg/L)")))%>%
-  filter(!is.na(DO_mgL_HYPO))%>%
-  ggplot(aes(x=oxy_class,y=DO_mgL_HYPO))+
-  #scale_x_log10()+
-  geom_boxplot(outlier.shape = NA)+
-  geom_jitter(width=0.2)+
-  geom_hline(yintercept = 0)+
-  theme_bw()+
-  #stat_compare_means(label.y = 0.9, label.x = .2)+
-  ylab("Coefficient for the\neffect of hypo. DO on TP")+
-  xlab("Oxygen status")+
-  theme(axis.title.x = element_blank())
-do
-dev.off()
+summary(lm(AF~log_Res_time, data = for_mlr)) #Take home: nothing comes out cleanly
 
 potential_drivers <- c("log_MeanDepth_m",
                       "log_MaximumDepth_m",
@@ -944,9 +814,15 @@ responses <- c("DO_demand_mgLd_HYPO_af")
 aic_calculator_onevar(for_mlr,responses,potential_drivers)
 summary(lm(DO_demand_mgLd_HYPO_af~log_MeanDepth_m, data = for_mlr)) #Take home: mean depth is most important
 
-p_value = summary(lm(DO_demand_mgLd_HYPO_af~log_MeanDepth_m, data = for_mlr))$coefficients[,4][2]
-if(p_value < 0.001){p_value_text = "< 0.001"}else{p_value_text = paste0("== ",as.character(round(p_value,3)))}
-r2_value = summary(lm(DO_demand_mgLd_HYPO_af~log_MeanDepth_m, data = for_mlr))$r.squared
+p_value = summary(lm(DO_demand_mgLd_HYPO_af~log_MeanDepth_m, 
+                     data = for_mlr #%>% filter(MeanDepth_m > 1)
+                     ))$coefficients[,4][2]
+if(p_value < 0.001){p_value_text = "< 0.001"}else{
+  p_value_text = paste0("== ",as.character(round(p_value,3)))
+  }
+r2_value = summary(lm(DO_demand_mgLd_HYPO_af~log_MeanDepth_m, 
+                      data = for_mlr #%>% filter(MeanDepth_m > 1)
+                      ))$r.squared
 r2_value_text = round(r2_value,2)
 
 jpeg("../Figures/Effect of VHOD on AF.jpg", width = 4, height = 4, res = 300, units = "in")
@@ -954,7 +830,7 @@ demand_af <- for_mlr%>%
   filter(!is.na(DO_demand_mgLd_HYPO_af),
          !is.na(MeanDepth_m))%>%
   ggplot(aes(x=MeanDepth_m,y=DO_demand_mgLd_HYPO_af))+
-  geom_smooth(method = "lm", color = "black")+
+  geom_smooth(method = "lm", color = "black")+ #, data = . %>% filter(MeanDepth_m > 1))+
   geom_point()+
   scale_x_log10()+
   geom_hline(yintercept = 0)+
@@ -1041,7 +917,7 @@ do_tp <- with_lags%>%
          on_other_fig = ifelse(!is.na(TP_ugL_HYPO) & 
                                  !is.na(depth_ratio_HYPO) & 
                                  !is.na(DO_mgL_HYPO) & 
-                                 DO_mgL_HYPO<1.7 & 
+                                 DO_mgL_HYPO<1.8 & 
                                  depth_ratio_HYPO<1,
                                "y",
                                "n"))%>%
@@ -1052,7 +928,7 @@ do_tp <- with_lags%>%
   xlab("Hypolimnetic DO (mg/L)")+
   ylab("Hypolimnetic TP (µg/L)")+
   scale_color_manual(values = c("black","blue"))+
-  geom_vline(xintercept = 1.7, color = "black")+
+  geom_vline(xintercept = 1.8, color = "black")+
   theme_bw()+
   theme(legend.position = "none")
 do_tp
@@ -1075,7 +951,7 @@ do_tp_af_all <- with_lags%>%
   xlab("Hypolimnetic DO (mg/L)")+
   ylab("Hypolimnetic TP (µg/L)")+
   scale_fill_viridis_c(na.value = alpha("white", 0), name = "Anoxic\nfactor")+
-  geom_vline(xintercept = 1.7, color = "black")+
+  geom_vline(xintercept = 1.8, color = "black")+
   theme_bw()
 
 jpeg("../Figures/DO TP colored by AF.jpeg", width = 4, height = 3, res = 300, units = "in")
@@ -1099,7 +975,7 @@ do_tp_af <- with_lags%>%
   xlab("Hypolimnetic DO (mg/L)")+
   ylab("Hypolimnetic TP (µg/L)")+
   scale_color_manual(values = c("black","blue"))+
-  geom_vline(xintercept = 1.7, color = "black")+
+  geom_vline(xintercept = 1.8, color = "black")+
   theme_bw()+
   theme(legend.position = "none")
 do_tp_af
@@ -1109,7 +985,7 @@ depth_tp_reg <- with_lags%>%
   filter(!is.na(TP_ugL_HYPO),
          !is.na(depth_ratio_HYPO),
          !is.na(DO_mgL_HYPO))%>%
-  filter(DO_mgL_HYPO<1.7,
+  filter(DO_mgL_HYPO<1.8,
          depth_ratio_HYPO<1)%>%
   mutate(log_TP_ugL_HYPO = log10(TP_ugL_HYPO))%>%
   ungroup()
@@ -1120,7 +996,7 @@ depth_tp <- with_lags%>%
   filter(!is.na(TP_ugL_HYPO),
          !is.na(depth_ratio_HYPO),
          !is.na(DO_mgL_HYPO))%>%
-  filter(DO_mgL_HYPO<1.7,
+  filter(DO_mgL_HYPO<1.8,
          depth_ratio_HYPO<1)%>%
   ungroup()%>%
   mutate(label = paste0("n = ",n()," lake-years\nn = ",length(unique(LakeID))," lakes"))%>%
@@ -1144,7 +1020,7 @@ af_tp <- with_lags%>%
   filter(!is.na(TP_ugL_HYPO),
          !is.na(AF),
          AF > 0)%>%
-  #filter(DO_mgL_HYPO<1.7)%>%
+  #filter(DO_mgL_HYPO<1.8)%>%
   ungroup()%>%
   mutate(label = paste0("n = ",n()," lake-years\nn = ",length(unique(LakeID))," lakes"))%>%
   ggplot()+
@@ -1212,9 +1088,9 @@ status_data <- with_temp%>%
   group_by(LakeID)%>%
   arrange(LakeID,Year)%>%
   filter(!is.na(DO_mgL_HYPO))%>%
-  filter(sum(DO_mgL_HYPO<1.7)>=1,
+  filter(sum(DO_mgL_HYPO<1.8)>=1,
          )%>%
-  mutate(anoxic_date = min(Year[DO_mgL_HYPO<1.7]),
+  mutate(anoxic_date = min(Year[DO_mgL_HYPO<1.8]),
          first_date = min(Year),
          end_date = max(Year),
          status = ifelse(Year>anoxic_date,"post-anoxia","pre-anoxia"),
