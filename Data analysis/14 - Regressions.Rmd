@@ -11,9 +11,10 @@ Table of contents:
 Step 1: Load packages and data
 Step 2: Format data for regressions
 Step 3: Model selection
-Step 4: Generate combined figures
-Step 5: Driver analysis
-Step 6: DO/TP figure
+Step 4: Segmented TP regression
+Step 5: Generate combined figures
+Step 6: Driver analysis
+Step 7: Before and after the first year of anoxia (figure)
 
 
 Step 1: Load packages and data
@@ -65,15 +66,15 @@ with_lags <- with_temp%>%
          epi_n_lag = lag(TN_ugL_EPI),
          hypo_n_lag = lag(TN_ugL_HYPO),
          AF_lag = lag(AF),
-         summer_temp = (temp_july+temp_aug)/2,
-         spring_temp = (temp_mar+temp_apr)/2,
-         winter_temp = (temp_jan+temp_feb)/2,
+         summer_temp = (temp_july + temp_aug)/2,
+         spring_temp = (temp_mar + temp_apr)/2,
+         winter_temp = (temp_jan + temp_feb)/2,
          fall_temp = (temp_sep+temp_oct)/2,
-         summer_precip = (precip_july+precip_aug)/2,
-         spring_precip = (precip_mar +precip_apr)/2,
-         winter_precip = (precip_jan +precip_feb)/2,
-         anoxic = max(DO_mgL_HYPO,na.rm = T)<1,
-         lag_is_last_year = ifelse(lag(Year)==(Year-1),T,F))%>%
+         summer_precip = (precip_july+ precip_aug)/2,
+         spring_precip = (precip_mar + precip_apr)/2,
+         winter_precip = (precip_jan + precip_feb)/2,
+         anoxic = max(DO_mgL_HYPO,na.rm = T) < 1.8,
+         lag_is_last_year = ifelse(lag(Year) == (Year-1), T, F))%>%
   mutate(across(contains("_lag"), function(x) ifelse(lag_is_last_year, x, NA)))
 
 # Save this as the dataset we will work with
@@ -96,15 +97,20 @@ data_log_nuts <- dataset%>%
          hypo_n_lag = log(hypo_n_lag)) #produces NAs because of two EPI TN == 0
 
 #Create datasets that are only oxic or only anoxic lakes
-data_no_anoxic <- dataset%>%
-  filter(anoxic==F)
-
 data_always_oxic <- dataset %>%
-  filter(!is.finite(max(AF, na.rm = T)) || max(AF, na.rm = T) == 0,
-         !is.finite(min(DO_mgL_HYPO, na.rm = T)) || min(DO_mgL_HYPO, na.rm = T) >= 1.8)
+  group_by(LakeID) %>%
+  filter(!is.finite(max(AF, na.rm = T)) || max(AF, na.rm = T) > 0,
+         min(DO_mgL_HYPO, na.rm = T) > 1.8)
 
 data_no_oxic <- dataset %>%
-  filter(max(AF, na.rm = T) > 0)
+  group_by(LakeID) %>%
+  filter(is.finite(max(AF, na.rm = T)) && max(AF, na.rm = T) > 0)
+
+#How many always oxic lakes are we removing?
+compare <- dataset %>%
+  group_by(LakeID) %>%
+  filter(is.finite(max(AF, na.rm = T)))
+length(unique(compare$LakeID)) - length(unique(data_no_oxic$LakeID))
 ```
 
 
@@ -137,14 +143,14 @@ potential_drivers <- c("DO_demand_mgLd_HYPO",
                       "Temp_C_HYPO",
                       "DO_date_HYPO"
                       )
-aic_calculator_lmer(data_no_anoxic,responses,potential_drivers, interaction = "+")
+aic_calculator_lmer(data_always_oxic,responses,potential_drivers, interaction = "+")
 selected_drivers <- c("DO_demand_mgLd_HYPO", "spring_temp", "DO_date_HYPO")
-std_data <- standardize_data(data_no_anoxic,responses,selected_drivers)
-all_lakes_do <- mod_by_lake(data_no_anoxic,responses,selected_drivers, interaction = "+")
+std_data <- standardize_data(data_always_oxic,responses,selected_drivers)
+all_lakes_do <- mod_by_lake(data_always_oxic,responses,selected_drivers, interaction = "+")
 mod_lmer <- lmer(DO_mgL_HYPO~DO_demand_mgLd_HYPO+spring_temp+DO_date_HYPO+(1|LakeID), data = std_data) 
 vif(mod_lmer)
-hypo_do_oxic <- plot_effects_lmer(mod_lmer,"Hypolimnetic DO (oxic; mg/L)", poster = POSTER) 
-hypo_do_oxic_ridge <- plot_effects_by_lake_lmer_ridge(all_lakes_do,"Hypolimnetic DO (oxic; mg/L)",mod_lmer, poster = POSTER)
+hypo_do_oxic <- plot_effects_lmer(mod_lmer,"Hypolimnetic DO (in oxic lakes)", poster = POSTER) 
+hypo_do_oxic_ridge <- plot_effects_by_lake_lmer_ridge(all_lakes_do,"Hypolimnetic DO (in oxic lakes)",mod_lmer, poster = POSTER)
 
 ### Anoxic factor
 responses <- c("AF")
@@ -155,7 +161,7 @@ potential_drivers <- c("DO_demand_mgLd_HYPO",
                       "Temp_C_HYPO"
                       )
 aic_calculator_lmer(dataset,responses,potential_drivers, interaction = "+")
-aic_calculator_lmer(data_no_oxic,responses,potential_drivers, interaction = "+") #same results
+aic_calculator_lmer(data_no_oxic,responses,potential_drivers, interaction = "+") #same results - using no oxic
 selected_drivers <- c("DO_demand_mgLd_HYPO","spring_temp","fall_temp","Temp_C_HYPO")
 std_data <- standardize_data(dataset,responses,selected_drivers) #all lakes for across-lake regression
 all_lakes_af <- mod_by_lake(data_no_oxic,responses,selected_drivers, interaction = "+") #only oxic lakes here
@@ -169,7 +175,6 @@ af_ridge <- plot_effects_by_lake_lmer_ridge(all_lakes_af,"Anoxic factor",mod_lme
 responses <- c("VHOD5_mgLd_HYPO")
 potential_drivers <- c("Chla_ugL_EPI",
                       "chla_lag",
-                      #"DOC_mgL_HYPO",
                       "spring_temp",
                       "strat_Temp_C_HYPO",
                       "strat_buoyancy_freq_EPI"
@@ -236,8 +241,8 @@ potential_drivers <- c("strat_TP_ugL_EPI",
                       "summer_temp",
                       "Chla_date_EPI")
 
-length(unique(data_log_nuts$LakeID[!is.na(data_log_nuts$strat_TN_ugL_EPI)])) #76
-length(unique(data_log_nuts$LakeID[!is.na(data_log_nuts$strat_TP_ugL_EPI)])) #368
+length(unique(data_log_nuts$LakeID[!is.na(data_log_nuts$strat_TN_ugL_EPI)])) #86
+length(unique(data_log_nuts$LakeID[!is.na(data_log_nuts$strat_TP_ugL_EPI)])) #387
 
 aic_calculator_lmer(data_log_nuts,responses,potential_drivers, interaction = "+")
 selected_drivers <- c("spring_temp","strat_TP_ugL_EPI")
@@ -251,7 +256,7 @@ epi_chla_ridge <- plot_effects_by_lake_lmer_ridge(all_lakes_chla,"Epilimnetic ch
 ```
 
 
-Segmented TP regression
+Step 4: Segmented TP regression
 ```{r}
 ### Without AF
 responses <- c("TP_ugL_HYPO")
@@ -266,12 +271,6 @@ potential_drivers <- c("DO_mgL_HYPO",
                       )
 aic_calculator_lmer(data_log_nuts,responses,potential_drivers, interaction = "+")
 selected_drivers <- c("DO_mgL_HYPO","strat_TP_ugL_EPI","winter_precip")
-std_data <-standardize_data(data_log_nuts,responses,selected_drivers)
-all_lakes_hypoP <- mod_by_lake(data_log_nuts,responses,selected_drivers, interaction = "+")
-mod_lmer <- lmer(TP_ugL_HYPO~DO_mgL_HYPO+strat_TP_ugL_EPI+winter_precip+(1|LakeID), data = std_data)
-vif(mod_lmer)
-hypo_p <- plot_effects_lmer(mod_lmer,"Hypolimnetic TP (µg/L)", poster = POSTER) 
-hypo_p_ridge <- plot_effects_by_lake_lmer_ridge(all_lakes_hypoP,"Hypolimnetic TP (µg/L)",mod_lmer, poster = POSTER)
 #SEGMENTED
 mod_seg <- lme(TP_ugL_HYPO~DO_mgL_HYPO+strat_TP_ugL_EPI+winter_precip, random=~1|LakeID, data = data_log_nuts%>%
   dplyr::select(all_of(c(selected_drivers,responses,"LakeID")))%>%
@@ -281,190 +280,41 @@ seglme <- segmented.lme(mod_seg, random=list(LakeID=pdDiag(~1)), seg.Z = ~DO_mgL
 break_untrans <- round(unique(seglme$fixed.eta.psi),1)
 summary(seglme)
 
-```
-
-
-Step 4: Generate combined figures
-```{r}
-g1 <- ggplotGrob(
-  hypo_p  +theme(plot.title = element_text(size = 10),
-                         plot.subtitle = element_text(size = 9),
-                         axis.title.x = element_blank())+
-                   force_panelsizes(rows = unit(3*5/6, "cm")))
-g2 <- ggplotGrob(
-  epi_p   +theme(plot.title = element_text(size = 10),
-                         plot.subtitle = element_text(size = 9),
-                         axis.title.x = element_blank())+
-                   force_panelsizes(rows = unit(6*5/6, "cm")))
-g3 <- ggplotGrob(
-  epi_chla+theme(plot.title = element_text(size = 10),
-                         plot.subtitle = element_text(size = 9))+
-                   force_panelsizes(rows = unit(2*5/6, "cm")))
-g4 <- ggplotGrob(
-  vhod    +theme(plot.title = element_text(size = 10),
-                         plot.subtitle = element_text(size = 9),
-                         axis.title.x = element_blank())+
-                   force_panelsizes(rows = unit(4*5/6, "cm")))
-g5 <- ggplotGrob(
-  hypo_do_oxic +theme(plot.title = element_text(size = 10),
-                         plot.subtitle = element_text(size = 9))+
-                   force_panelsizes(rows = unit(4*5/6, "cm")))
-maxWidth <- unit.pmax(g1$widths,g2$widths,g3$widths,g4$widths,g5$widths)
-g1$widths <- maxWidth
-g2$widths <- maxWidth
-g3$widths <- maxWidth
-g4$widths <- maxWidth
-g5$widths <- maxWidth
-
-layout <- rbind(c(1, 4),
-                c(1, 4),
-                c(1, 4),
-                c(1, 4),
-                c(1, 4),
-                c(2, 4),
-                c(2, 5),
-                c(2, 5),
-                c(2, 5),
-                c(2, 5),
-                c(2, 5),
-                c(2, 5),
-                c(2, NA),
-                c(3, NA),
-                c(3, NA),
-                c(3, NA),
-                c(3, NA),
-                c(3, NA))
-jpeg("../Figures/MLR-lmer/Parameter estimate-all-custom layout.jpeg", width = 7, height = 6.5, res = 300, units = "in")
-grid.arrange(g1,g2,g3,g4,g5,layout_matrix=layout)
-dev.off()
-
-#GLEON poster
-
-g1 <- ggplotGrob(hypo_p  +
-                   #ggtitle("Bottom-water phosphorus")+
-                   theme(plot.title = element_text(size = 10),
-                         plot.subtitle = element_text(size = 9),
-                         axis.title.x = element_blank())+
-                   force_panelsizes(rows = unit(3*5/6, "cm")))
-g2 <- ggplotGrob(epi_p   +
-                   #ggtitle("Surface phosphorus")+
-                   theme(plot.title = element_text(size = 10),
-                         plot.subtitle = element_text(size = 9),
-                         axis.title.x = element_blank())+
-                   force_panelsizes(rows = unit(6*5/6, "cm")))
-g3 <- ggplotGrob(epi_chla+
-                   #ggtitle("Surface phytoplankton")+
-                   theme(plot.title = element_text(size = 10),
-                         plot.subtitle = element_text(size = 9),
-                         axis.title.x = element_blank())+
-                   force_panelsizes(rows = unit(2*5/6, "cm")))
-g4 <- ggplotGrob(vhod    +
-                   #ggtitle("Oxygen consumption")+
-                   theme(plot.title = element_text(size = 10),
-                         plot.subtitle = element_text(size = 9))+
-                   force_panelsizes(rows = unit(4*5/6, "cm")))
-g5 <- ggplotGrob(hypo_do_oxic +
-                   #ggtitle("Bottom-water oxygen")+
-                   theme(plot.title = element_text(size = 10),
-                         plot.subtitle = element_text(size = 9))+
-                   force_panelsizes(rows = unit(4*5/6, "cm")))
-
-maxWidth <- unit.pmax(g1$widths,g2$widths,g3$widths,g4$widths,g5$widths)
-g1$widths <- maxWidth
-g2$widths <- maxWidth
-g3$widths <- maxWidth
-g4$widths <- maxWidth
-g5$widths <- maxWidth
-
-layout <- rbind(c(1, 2),
-                c(1, 2),
-                c(1, 2),
-                c(1, 2),
-                c(3, 2),
-                c(3, 2),
-                c(3, 5),
-                c(4, 5),
-                c(4, 5),
-                c(4, 5),
-                c(4, 5),
-                c(4, NA))
-
-jpeg("../Figures/MLR-lmer/Parameter estimate-all-custom layout poster.jpeg", width = 6.6, height = 5.5, res = 600, units = "in")
-grid.arrange(g1,g2,g3,g4,g5, layout_matrix=layout)
-dev.off()
-
-g1 <- ggplotGrob(hypo_p_ridge   
-                 #+ggtitle("Bottom-water phosphorus")
-                 +theme(plot.title = element_text(size = 10),
-                         plot.subtitle = element_text(size = 9),
-                         axis.title.x = element_blank())+
-                   force_panelsizes(rows = unit(3, "cm")))
-g2 <- ggplotGrob(epi_p_ridge  
-                 #+ggtitle("Surface phosphorus")
-                 +theme(plot.title = element_text(size = 10),
-                         plot.subtitle = element_text(size = 9),
-                         axis.title.x = element_blank())+
-                   force_panelsizes(rows = unit(6, "cm")))
-g3 <- ggplotGrob(epi_chla_ridge
-                 #+ggtitle("Surface cholorphyll-a")
-                 +theme(plot.title = element_text(size = 10),
-                         plot.subtitle = element_text(size = 9),
-                         axis.title.x = element_blank())+
-                   force_panelsizes(rows = unit(2, "cm")))
-g4 <- ggplotGrob(vhod_ridge    
-                 #+ggtitle("Oxygen demand")
-                 +theme(plot.title = element_text(size = 10),
-                         plot.subtitle = element_text(size = 9))+
-                   force_panelsizes(rows = unit(4, "cm")))
-g5 <- ggplotGrob(hypo_do_oxic_ridge 
-                 #+ggtitle("Bottom-water oxygen")
-                 +theme(plot.title = element_text(size = 10),
-                         plot.subtitle = element_text(size = 9))+
-                   force_panelsizes(rows = unit(4, "cm")))
-maxWidth <- unit.pmax(g1$widths,g2$widths,g3$widths,g4$widths,g5$widths)
-g1$widths <- maxWidth
-g2$widths <- maxWidth
-g3$widths <- maxWidth
-g4$widths <- maxWidth
-g5$widths <- maxWidth
-layout <- rbind(c(1, 2),
-                c(1, 2),
-                c(1, 2),
-                c(1, 2),
-                c(1, 2),
-                c(1, 2),
-                c(1, 2),
-                c(1, 2),
-                c(3, 2),
-                c(3, 2),
-                c(3, 2),
-                c(3, 2),
-                c(3, 2),
-                c(3, 5),
-                c(3, 5),
-                c(4, 5),
-                c(4, 5),
-                c(4, 5),
-                c(4, 5),
-                c(4, 5),
-                c(4, 5),
-                c(4, 5),
-                c(4, 5),
-                c(4, 5),
-                c(4, NA))
-jpeg("../Figures/MLR-lmer/Parameter estimate-all-ridge.jpeg", width = 6, height = 6, res = 300, units = "in")
-grid.arrange(g1,g2,g3,g4,g5, layout_matrix=layout)
+jpeg("../Figures/DO TP black.jpeg", width = 3, height = 3, res = 300, units = "in")
+do_tp <- with_lags%>%
+  filter(!is.na(TP_ugL_HYPO))%>%
+  ungroup()%>%
+  mutate(label = paste0("n = ", n(), " lake-years\nn = ",
+                        length(unique(LakeID))," lakes"),
+         on_other_fig = ifelse(!is.na(TP_ugL_HYPO) & 
+                                 !is.na(depth_ratio_HYPO) & 
+                                 !is.na(DO_mgL_HYPO) & 
+                                 DO_mgL_HYPO < 1.8 & 
+                                 depth_ratio_HYPO < 1,
+                               "y",
+                               "n"))%>%
+  ggplot()+
+  scale_y_log10()+
+  geom_point(aes(x = DO_mgL_HYPO,y=TP_ugL_HYPO,color = on_other_fig), alpha = 0.2)+
+  geom_text(aes(x = 2.5, y=5000,label = label),data = .%>%dplyr::select(label)%>%unique(), hjust = 0, size = 3.5)+
+  xlab("Hypolimnetic DO (mg/L)")+
+  ylab("Hypolimnetic TP (µg/L)")+
+  scale_color_manual(values = c("black","black"))+
+  geom_vline(xintercept = 1.8, color = "black")+
+  theme_bw()+
+  theme(legend.position = "none")
+do_tp
 dev.off()
 ```
 
 
-Step 5: Generate combined figures - anoxic factor
+Step 5: Generate combined figures
 ```{r}
 g1 <- ggplotGrob(
   hypo_p_af  +theme(plot.title = element_text(size = 10),
                          plot.subtitle = element_text(size = 9),
                          axis.title.x = element_blank())+
-                   force_panelsizes(rows = unit(2*5/6, "cm")))
+                   force_panelsizes(rows = unit(3*5/6, "cm")))
 g2 <- ggplotGrob(
   epi_p   +theme(plot.title = element_text(size = 10),
                          plot.subtitle = element_text(size = 9),
@@ -496,19 +346,18 @@ layout <- rbind(c(1, 4),
                 c(1, 4),
                 c(1, 4),
                 c(2, 4),
-                c(2, 4),
                 c(2, 5),
                 c(2, 5),
                 c(2, 5),
                 c(2, 5),
                 c(2, 5),
-                c(3, 5),
+                c(2, 5),
+                c(2, 5),
                 c(3, NA),
                 c(3, NA),
                 c(3, NA),
                 c(3, NA),
-                c(3, NA),
-                c(NA, NA))
+                c(3, NA))
 jpeg("../Figures/MLR-lmer/Parameter estimate-all-custom layout-AF.jpeg", width = 7, height = 6, res = 300, units = "in")
 grid.arrange(g1,g2,g3,g4,g5,layout_matrix=layout)
 dev.off()
@@ -518,7 +367,7 @@ g1 <- ggplotGrob(hypo_p_ridge_af
                  +theme(plot.title = element_text(size = 10),
                          plot.subtitle = element_text(size = 9),
                          axis.title.x = element_blank())+
-                   force_panelsizes(rows = unit(2, "cm")))
+                   force_panelsizes(rows = unit(3, "cm")))
 g2 <- ggplotGrob(epi_p_ridge  
                  #+ggtitle("Surface phosphorus")
                  +theme(plot.title = element_text(size = 10),
@@ -554,14 +403,14 @@ layout <- rbind(c(1, 2),
                 c(1, 2),
                 c(1, 2),
                 c(1, 2),
+                c(1, 2),
                 c(3, 2),
                 c(3, 2),
                 c(3, 2),
                 c(3, 2),
                 c(3, 2),
-                c(3, 2),
-                c(3, 2),
-                c(3, 2),
+                c(3, 5),
+                c(3, 5),
                 c(4, 5),
                 c(4, 5),
                 c(4, 5),
@@ -571,15 +420,15 @@ layout <- rbind(c(1, 2),
                 c(4, 5),
                 c(4, 5),
                 c(4, 5),
-                c(4, 5),
-                c(4, 5))
-jpeg("../Figures/MLR-lmer/Parameter estimate-all-ridge-af.jpeg", width = 6, height = 5.5, res = 300, units = "in")
+                c(4, NA),
+                c(4, NA))
+jpeg("../Figures/MLR-lmer/Parameter estimate-all-ridge-af.jpeg", width = 6, height = 6, res = 300, units = "in")
 grid.arrange(g1,g2,g3,g4,g5, layout_matrix=layout)
 dev.off()
 ```
 
 
-Step 5: Driver analysis
+Step 6: Driver analysis
 ```{r}
 incomplete <- all_lakes_chla%>%
   dplyr::select(strat_TP_ugL_EPI,LakeID)%>%
@@ -906,150 +755,7 @@ dev.off()
 ```
 
 
-Step 7: DO/TP figure
-```{r}
-jpeg("../Figures/DO TP.jpeg", width = 3, height = 3, res = 300, units = "in")
-do_tp <- with_lags%>%
-  filter(!is.na(TP_ugL_HYPO))%>%
-  ungroup()%>%
-  mutate(label = paste0("n = ", n(), " lake-years\nn = ",
-                        length(unique(LakeID))," lakes"),
-         on_other_fig = ifelse(!is.na(TP_ugL_HYPO) & 
-                                 !is.na(depth_ratio_HYPO) & 
-                                 !is.na(DO_mgL_HYPO) & 
-                                 DO_mgL_HYPO < 1.8 & 
-                                 depth_ratio_HYPO < 1,
-                               "y",
-                               "n"))%>%
-  ggplot()+
-  scale_y_log10()+
-  geom_point(aes(x = DO_mgL_HYPO,y=TP_ugL_HYPO,color = on_other_fig), alpha = 0.2)+
-  geom_text(aes(x = 2.5, y=5000,label = label),data = .%>%dplyr::select(label)%>%unique(), hjust = 0, size = 3.5)+
-  xlab("Hypolimnetic DO (mg/L)")+
-  ylab("Hypolimnetic TP (µg/L)")+
-  scale_color_manual(values = c("black","blue"))+
-  geom_vline(xintercept = 1.8, color = "black")+
-  theme_bw()+
-  theme(legend.position = "none")
-do_tp
-dev.off()
-
-jpeg("../Figures/DO TP black.jpeg", width = 3, height = 3, res = 300, units = "in")
-do_tp + scale_color_manual(values = c("black","black"))
-dev.off()
-
-do_tp_af_all <- with_lags%>%
-  filter(!is.na(TP_ugL_HYPO))%>%
-  ungroup()%>%
-  mutate(label = paste0("n = ", n(), " lake-years\nn = ",
-                        length(unique(LakeID))," lakes"))%>%
-  ggplot()+
-  scale_y_log10()+
-  geom_point(aes(x = DO_mgL_HYPO, y=TP_ugL_HYPO, fill = AF), alpha = 0.3, pch = 21, stroke = 0.2)+
-  geom_text(aes(x = 2.5, y=5000,label = label),
-            data = .%>%dplyr::select(label)%>%unique(), hjust = 0, size = 3.5)+
-  xlab("Hypolimnetic DO (mg/L)")+
-  ylab("Hypolimnetic TP (µg/L)")+
-  scale_fill_viridis_c(na.value = alpha("white", 0), name = "Anoxic\nfactor")+
-  geom_vline(xintercept = 1.8, color = "black")+
-  theme_bw()
-
-jpeg("../Figures/DO TP colored by AF.jpeg", width = 4, height = 3, res = 300, units = "in")
-do_tp_af_all
-dev.off()
-
-jpeg("../Figures/DO TP af.jpeg", width = 3, height = 3, res = 300, units = "in")
-do_tp_af <- with_lags%>%
-  filter(!is.na(TP_ugL_HYPO))%>%
-  ungroup()%>%
-  mutate(label = paste0("n = ", n(), " lake-years\nn = ",
-                        length(unique(LakeID))," lakes"),
-         on_other_fig = ifelse(!is.na(AF) & 
-                                 AF > 0,
-                               "y",
-                               "n"))%>%
-  ggplot()+
-  scale_y_log10()+
-  geom_point(aes(x = DO_mgL_HYPO,y=TP_ugL_HYPO,color = on_other_fig), alpha = 0.2)+
-  geom_text(aes(x = 2.5, y=5000,label = label),data = .%>%dplyr::select(label)%>%unique(), hjust = 0, size = 3.5)+
-  xlab("Hypolimnetic DO (mg/L)")+
-  ylab("Hypolimnetic TP (µg/L)")+
-  scale_color_manual(values = c("black","blue"))+
-  geom_vline(xintercept = 1.8, color = "black")+
-  theme_bw()+
-  theme(legend.position = "none")
-do_tp_af
-dev.off()
-
-depth_tp_reg <- with_lags%>%
-  filter(!is.na(TP_ugL_HYPO),
-         !is.na(depth_ratio_HYPO),
-         !is.na(DO_mgL_HYPO))%>%
-  filter(DO_mgL_HYPO < 1.8,
-         depth_ratio_HYPO<1)%>%
-  mutate(log_TP_ugL_HYPO = log10(TP_ugL_HYPO))%>%
-  ungroup()
-summary(lm(log_TP_ugL_HYPO~depth_ratio_HYPO, data = depth_tp_reg))
-
-jpeg("../Figures/Depth TP.jpeg", width = 3, height = 3, res = 300, units = "in")
-depth_tp <- with_lags%>%
-  filter(!is.na(TP_ugL_HYPO),
-         !is.na(depth_ratio_HYPO),
-         !is.na(DO_mgL_HYPO))%>%
-  filter(DO_mgL_HYPO < 1.8,
-         depth_ratio_HYPO<1)%>%
-  ungroup()%>%
-  mutate(label = paste0("n = ",n()," lake-years\nn = ",length(unique(LakeID))," lakes"))%>%
-  ggplot()+
-  scale_y_log10(limits = c(min(with_lags$TP_ugL_HYPO,na.rm=T),max(with_lags$TP_ugL_HYPO,na.rm=T)))+
-  geom_point(aes(x = depth_ratio_HYPO*100,y=TP_ugL_HYPO), color = "blue",alpha = 0.2)+
-  geom_text(aes(x = 4, y=5000,label = label),data = .%>%dplyr::select(label)%>%unique(), hjust = 0, size = 3.5)+
-  geom_smooth(aes(x = depth_ratio_HYPO*100,y=TP_ugL_HYPO), color = "black", method = "lm", lwd = .8)+
-  xlab("Anoxic extent\n(% of water column depth)")+
-  theme_bw()+
-  xlim(c(0,100))+
-  theme(axis.title.y = element_blank())
-depth_tp
-dev.off()
-
-af_tp <- with_lags%>%
-  mutate(on_other_fig = ifelse(!is.na(TP_ugL_HYPO) & 
-                                 !is.na(DO_mgL_HYPO),
-                               "y",
-                               "n"))%>%
-  filter(!is.na(TP_ugL_HYPO),
-         !is.na(AF),
-         AF > 0)%>%
-  #filter(DO_mgL_HYPO < 1.8)%>%
-  ungroup()%>%
-  mutate(label = paste0("n = ",n()," lake-years\nn = ",length(unique(LakeID))," lakes"))%>%
-  ggplot()+
-  scale_y_log10(limits = c(min(with_lags$TP_ugL_HYPO,na.rm=T),
-                           max(with_lags$TP_ugL_HYPO,na.rm=T)))+
-  #scale_x_sqrt()+
-  geom_point(aes(x = AF,y=TP_ugL_HYPO, color = on_other_fig), alpha = 0.2)+
-  geom_text(aes(x = 1, y=5000,label = label),
-            data = .%>% dplyr::select(label) %>% unique(), 
-            hjust = 0, size = 3.5)+
-  #geom_smooth(aes(x = AF,y=TP_ugL_HYPO), color = "black", method = "lm", lwd = .8)+
-  scale_color_manual(values = c("black","blue"))+
-  xlab("Anoxic factor (d)")+
-  theme_bw()+
-  theme(axis.title.y = element_blank(),
-        legend.position = "none")
-af_tp
-
-jpeg("../Figures/Depth DO and TP.jpeg", width = 6, height = 3, res = 300, units = "in")
-ggarrange(do_tp,depth_tp,align = "h")
-dev.off()
-
-jpeg("../Figures/AF and TP.jpeg", width = 6, height = 3, res = 300, units = "in")
-ggarrange(do_tp_af, af_tp, align = "h")
-dev.off()
-```
-
-
-Step 8: Before and after figure
+Step 7: Before and after the first year of anoxia (figure)
 ```{r}
 total <- with_temp%>%
   filter(!is.na(DO_mgL_HYPO))%>%
