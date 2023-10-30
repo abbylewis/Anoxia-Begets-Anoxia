@@ -37,7 +37,7 @@ lake_bats <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/b
   filter(Area_m2>0)%>%
   group_by(LakeID)%>%
   mutate(methods_n = length(unique(Method)))%>%
-  filter(methods_n==1|Method=="data")%>%
+  filter(methods_n==1|Method=="data")%>% #when possible use data rather than model
   ungroup()
 
 #Check bathymetric data availability
@@ -92,10 +92,10 @@ length(unique(vw_do_demand$LakeID[!is.na(vw_do_demand$DO_demand_mgLd)])) #418
 #How many rows get removed by filtering so R2>0.5? 246
 removed_by_r2 <- vw_do_demand%>%
   filter(r2_vol > .5)
-nrow(removed_by_r2[!is.na(removed_by_r2$DO_demand_mgLd),]) #5139
-nrow(vw_do_demand[!is.na(vw_do_demand$DO_demand_mgLd),]) #5385
-5385-5139
-(5385-5139)/5385
+nrow(removed_by_r2[!is.na(removed_by_r2$DO_demand_mgLd),]) #5140
+nrow(vw_do_demand[!is.na(vw_do_demand$DO_demand_mgLd),]) #5386
+5386-5140
+(5386-5140)/5386
 
 #How many rows get removed by filtering so oxygen demand is positive? 0
 removed_by_pos <- removed_by_r2%>%

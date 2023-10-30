@@ -7,7 +7,7 @@ output: html_document
 
 This code file interpolates DO and temperature data to a 1m depth resolution, following Jane et al. (2021)
 
-Methods to replicate: 
+Methods to replicate (copied from Jane et al. 2021 for reference): 
 Impossible values were first removed, which were defined as those less than 0 or greater than 40 for both temperature (degreesCelsius) and DO (milligramsPerLiter). Profiles were removed from further processing if this either removed greater than 95% of a profile or left less than three measurement depths in a profile. Some profiles lacked a 0 depth point. Prior to interpolation, this was added by 1) changing the minimum depth to 0 if it was less than 0.5 m, 2) adding a 0 depth point and assigning temperature and DO values equal to the shallowest available depth if it was greater than 0.5 m but less than or equal to 3 m deep, 3) if the minimum depth exceeded 3 m the profile was excluded from interpolation. Profiles were interpolated from 0 m to the deepest point at 0.5 m intervals using the pchip function of the pracma R package. 
 
 Table of contents for this markdown file:
@@ -15,8 +15,8 @@ Step 1: Load packages
 Step 2: QAQC
 Step 3: Plot the results of QAQC (this is presented as a figure in Appendix S3)
 Step 4: Interpolate DO, following Jane et al. (2021) - note that this will take up to 30 min to run all lakes
-Step 5: Interpolate temp - note that this will take up to 30 min to run all lakes
-Step 6: combine DO and temp
+Step 5: Interpolate temperature - note that this will take up to 30 min to run all lakes
+Step 6: Combine DO and temp
 
 
 Step 1: Load packages
@@ -31,6 +31,7 @@ library(ggpubr)
 
 
 Step 2: QAQC
+Load data from EDI and run QAQC
 ```{r}
 #import data
 to_profiles_all <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/caf59a118a1490e7cb1a219c55b920f9")
@@ -136,6 +137,7 @@ unclean_plot <- unclean%>%
   ylim(c(min(unclean$pct_sampled), 200))+ #allow space for text
   xlab("Reported maximum depth")+
   theme(axis.title.x = element_blank())
+
 unclean_sd <- unclean%>%
   ggplot(aes(x = reported_max_depth, y=sd_max))+
   geom_point(alpha = 0.3, color = "blue")+
@@ -213,7 +215,8 @@ dev.off()
 ```
 
 
-Step 4: Interpolate DO, following Jane et al. (2021) - note that this will take up to 30 min to run all lakes
+Step 4: Interpolate DO, following Jane et al. (2021)
+(note: this will take up to 30 minutes to run all lakes)
 ```{r}
 #Prep for interpolation
 
@@ -310,7 +313,8 @@ ploto <- ggplot(interpolatedvalues.do)+
 ```
 
 
-Step 5: Interpolate temp - note that this will take up to 30 min to run all lakes
+Step 5: Interpolate temperature
+(note: this will take up to 30 minutes to run all lakes)
 ```{r}
 #Prep for interpolation
 
@@ -415,7 +419,7 @@ plott<-ggplot(interpolatedvalues.t)+
 ```
 
 
-Step 6 combine DO and temp
+Step 6: Combine DO and temp
 ```{r}
 database.interp <- full_join(interpolatedvalues.t,
                              interpolatedvalues.do,
@@ -433,7 +437,7 @@ database.interp %>% filter(!is.na(DO_mgL)) %>% group_by(LakeID) %>% dplyr::selec
 to_profiles %>% filter(!is.na(Temp_C)) %>% group_by(LakeID) %>% dplyr::select(Date) %>% unique() #105481
 database.interp %>% filter(!is.na(Temp_C)) %>% group_by(LakeID) %>% dplyr::select(Date) %>% unique() #83503
 
-#look at time
+#look at the presence of data over time
 ggplot(database.interp %>% 
          group_by(LakeID,Date)%>%
          dplyr::summarize(meando=mean(DO_mgL))) +

@@ -46,12 +46,9 @@ strat_avgs = read.csv("../Compiled data/stratified_averages.csv")%>%
          strat_TN_date = TN_date,
          strat_buoyancy_freq = buoyancy_freq)
 
-bathy_anox <- read.csv("../Compiled data/anoxic_bathymetry.csv")
-
 summer_avgs_wide <- summer_avgs%>%
   dplyr::select(-Chla_ugL,-Chla_date,-DOC_mgL)%>%
   full_join(strat_avgs)%>%
-  full_join(bathy_anox%>%mutate(Layer="HYPO"))%>%
   full_join(do_demand_points%>%dplyr::select(DO_demand_mgLd, AHOD_mgLd,Year, LakeID)%>%mutate(Layer="HYPO"))%>%
   full_join(vhod5_points%>%dplyr::select(VHOD5_mgLd, Year, LakeID)%>%mutate(Layer="HYPO"))%>%
   unique()%>%
@@ -60,9 +57,9 @@ summer_avgs_wide <- summer_avgs%>%
                               DO_date, Chla_ugL, Chla_date, strat_Temp_C, 
                               strat_Temp_date, Temp_C, Temp_date, TN_ugL, 
                               TN_date, DO_demand_mgLd, AHOD_mgLd, buoyancy_freq, 
-                              areal_anoxia, depth_ratio, VHOD5_mgLd, hypo_depth, 
-                              strat_TP_ugL, strat_TN_ugL, strat_TP_date, 
-                              strat_TN_date, strat_buoyancy_freq,SA_vol_ratio))
+                              VHOD5_mgLd, hypo_depth, strat_TP_ugL, strat_TN_ugL,
+                              strat_TP_date, strat_TN_date, strat_buoyancy_freq,
+                              SA_vol_ratio))
 
 length(unique(summer_avgs_wide$LakeID))
 

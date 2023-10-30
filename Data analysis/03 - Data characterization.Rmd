@@ -120,7 +120,7 @@ states <- ne_states(returnclass = "sf",country = "United States of America")
 us_map <- ggplot(data = states) +
   geom_sf() +
   coord_sf(expand = FALSE, ylim = c(25, 50), xlim = c(-130,-60))+
-  geom_point(data = for_states, aes(Longitude_DD, Latitude_DD), fill = "red",shape = 21, color = "white", size = 2.8, alpha  =.2, stroke = .4)+
+  geom_point(data = for_states, aes(Longitude_DD, Latitude_DD), fill = "red",shape = 21, color = "white", size = 2.5, alpha  =.2, stroke = .4)+
   theme_bw()+
   annotation_north_arrow(location = "bl", which_north = "true", 
       pad_x = unit(0.2, "in"), pad_y = unit(0.2, "in"),

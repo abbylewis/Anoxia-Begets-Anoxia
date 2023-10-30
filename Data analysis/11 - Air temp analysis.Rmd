@@ -44,9 +44,10 @@ cor_data <- do_anomaly_stat%>%
   dplyr::select(hypo_do_anom,spr_temp_anom,Year)%>%
   na.omit()
 
+length(unique(cor_data$LakeID))
+
 pcor.test(cor_data$hypo_do_anom, cor_data$spr_temp_anom,cor_data$Year,method = "spearman")$estimate
 
-jpeg("../Figures/DO and air temp anomaly - spring.jpg", width = 5, height = 3, res = 300, units = "in")
 do_air_sum <- do_anomaly_stat%>%
   filter(!is.na(spr_temp_anom),
          !is.na(hypo_do_anom))%>%
@@ -62,69 +63,8 @@ do_air_sum <- do_anomaly_stat%>%
          do_anom_sum = factor(do_anom_sum, levels = c("> 0.2", "between -0.2 \nand 0.2", "< -0.2")))%>%
   group_by(temp_anom_sum)%>%
   mutate(n=n())
-length(unique(do_air_sum$LakeID))
-do_air_sum%>%
-  group_by(temp_anom_sum)%>%
-  mutate(temp_n = n())%>%
-  group_by(temp_anom_sum,do_anom_sum)%>%
-  dplyr::summarize(do_n = n(),
-            pct = do_n/unique(temp_n)*100)
-do_air_sum%>%
-  ggplot(aes(fill = do_anom_sum, x = temp_anom_sum))+
-  geom_bar(position = "fill")+
-  geom_hline(yintercept = .5, color = "grey80",lty = "dashed")+
-  geom_text(aes(y = .9, label = paste0("n = ",n)), color = "grey50")+
-  labs(fill="Hypolimnetic \nDO anomaly (mg/L)")+
-  xlab("Spring air temperature anomaly (ºC)")+
-  ylab("Percent of lake-years")+
-  scale_y_continuous(labels = scales::percent)+
-  theme_bw()+
-  scale_fill_viridis(discrete=T, direction = -1)
-dev.off()
-```
 
-
-Step 2.5: Generate temp anomaly summary fig (anoxic factor)
-```{r}
-zscore <- function(data, na.rm = T){(data-mean(data, na.rm = na.rm))/sd(data, na.rm = na.rm)}
-do_anomaly_stat <- with_temp%>%
-  group_by(LakeID)%>%
-  mutate(hypo_do_anom = AF - mean(AF, na.rm = T),
-         spr_temp = (temp_mar+temp_apr)/2,
-         spr_temp_anom = spr_temp - mean(spr_temp, na.rm = T))
-
-cor_data <- do_anomaly_stat%>%
-  dplyr::select(hypo_do_anom, spr_temp_anom, Year)%>%
-  na.omit()
-
-pcor.test(cor_data$hypo_do_anom, 
-          cor_data$spr_temp_anom,
-          cor_data$Year,
-          method = "spearman")$estimate
-
-jpeg("../Figures/AF and air temp anomaly - spring.jpg", width = 5, height = 3, res = 300, units = "in")
-do_air_sum <- do_anomaly_stat%>%
-  filter(!is.na(spr_temp_anom),
-         !is.na(hypo_do_anom))%>%
-  group_by(LakeID)%>%
-  mutate(poxic = ifelse(max(AF, na.rm = T) == 0, "y","n"))%>%
-  ungroup()%>%
-  filter(poxic=="n")%>%
-  mutate(temp_anom_sum = ifelse(spr_temp_anom>0.6,"> 0.6",
-                                ifelse(spr_temp_anom<(-0.6),"< -0.6","between -0.6 \nand 0.6")),
-         temp_anom_sum = factor(temp_anom_sum, levels = c("< -0.6", "between -0.6 \nand 0.6", "> 0.6")),
-         do_anom_sum = ifelse(hypo_do_anom > 1,"> 1",
-                                ifelse(hypo_do_anom<(-1),"< -1","between -1 \nand 1")),
-         do_anom_sum = factor(do_anom_sum, levels = c("> 1", "between -1 \nand 1", "< -1")))%>%
-  group_by(temp_anom_sum)%>%
-  mutate(n=n())
-length(unique(do_air_sum$LakeID))
-do_air_sum%>%
-  group_by(temp_anom_sum)%>%
-  mutate(temp_n = n())%>%
-  group_by(temp_anom_sum,do_anom_sum)%>%
-  dplyr::summarize(do_n = n(),
-            pct = do_n/unique(temp_n)*100)
+jpeg("../Figures/DO and air temp anomaly - spring.jpg", width = 5, height = 3, res = 300, units = "in")
 do_air_sum%>%
   ggplot(aes(fill = do_anom_sum, x = temp_anom_sum))+
   geom_bar(position = "fill")+
@@ -354,11 +294,12 @@ ggarrange(temp_temp+theme(axis.title.x = element_blank()),temp_demand+theme(axis
           common.legend = T, legend = "bottom",nrow=3, labels = "auto", align = "hv")
 dev.off()
 
-jpeg("../Figures/Monthly correlations af.jpg", width = 5, height = 8, res = 300, units = "in")
+jpeg("../Figures/Monthly correlations af.jpg", width = 5, height = 9, res = 300, units = "in")
 ggarrange(temp_temp + theme(axis.title.x = element_blank()),
           temp_demand + theme(axis.title.x = element_blank()),
+          do_temp + theme(axis.title.x = element_blank()),
           do_temp_af,
-          common.legend = T, legend = "bottom", nrow=3, 
+          common.legend = T, legend = "bottom", nrow=4, 
           labels = "auto", align = "hv")
 dev.off()
 ```

@@ -135,7 +135,7 @@ thermo_depths_sum <- thermo_depths%>%
   group_by(LakeID)%>%
   dplyr::mutate(count_unstrat_tot = sum(count_unstrat),
                 n = sum(n))%>%
-  filter((count_unstrat_tot/n) <0.1,
+  filter((count_unstrat_tot/n) < 0.1,
          count_unstrat == 0)%>%
   group_by(LakeID,Year)%>%
   dplyr::summarize(epi_sd = sd(epi_depth, na.rm = T),
@@ -148,6 +148,7 @@ full_with_thermo <- full_trimmed%>%
   filter(!is.na(epi_depth),
          !is.na(hypo_depth)
          )
+
 write.csv(full_with_thermo,"../Compiled data/Stratified_period_data_with_thermo.csv",row.names = F)
 
 summer_layers <- full_with_thermo%>%

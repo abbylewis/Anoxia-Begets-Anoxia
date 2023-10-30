@@ -11,7 +11,7 @@ Step 1: Load data and packages
 Step 2: Calculate VW DO
 Step 3: Model end of stratification date
 Step 4: Model start of anoxia date using oxygen demand
-Step 5: Empirically calculate start and end of anoxia date if it can be determined within a certain range
+Step 5: Empirically calculate start of anoxia date if it can be determined within a certain range (PROXIMITY)
 Step 6: Calculate AF, combining all info
 Step 7: If VW DO is high all summer, AF = 0 (filling in lakes where we couldn't use oxygen demand)
 Step 8: Export and plot
@@ -104,6 +104,7 @@ for_new_model <- annual_data %>%
   drop_na()
 
 length(unique(for_new_model$LakeID))
+nrow(for_new_model)
 
 new_model <- lm(log10(for_new_model$mixing_date) ~ log10(for_new_model$Temp_C_HYPO) +
      log10(for_new_model$MeanDepth_m) +
@@ -120,6 +121,8 @@ new_strat_end_model <- annual_data %>%
                                  )) %>%
   dplyr::select(LakeID, Year, strat_end_new_model) %>%
   unique()
+
+summary(new_model)
 ```
 
 
@@ -163,14 +166,16 @@ vw_do_demand_qaqc <- removed_by_pos%>%
 ```
 
 
-Step 5: Empirically calculate start and end of anoxia date if it can be determined within a certain range (PROXIMITY)
+Step 5: Empirically calculate start of anoxia date if it can be determined within a certain range (PROXIMITY)
 ```{r}
 PROXIMITY = 7
 
 empirical_anoxic_onset <- vw_do %>%
   group_by(LakeID, Year)%>%
   filter(sum(DO_mgL_vol < DO_THRESH, na.rm = T) >= 1,
-         sum(DO_mgL_vol > DO_THRESH, na.rm = T) >= 1) %>%
+         sum(DO_mgL_vol >= DO_THRESH & 
+               Date < first(Date[DO_mgL_vol < DO_THRESH]), 
+             na.rm = T) >= 1) %>%
   mutate(onset = first(Date[DO_mgL_vol < DO_THRESH]),
          before = last(Date[Date<onset]),
          interval = as.numeric(onset-before),
@@ -249,7 +254,7 @@ anoxic_on_off %>%
   filter(!is.na(anoxic_onset_data),
          !is.na(anoxic_onset_vhod)) %>%
   ggplot(aes(x = anoxic_onset_data, y = anoxic_onset_vhod))+
-  geom_abline(slope = 1)+
+  #geom_abline(slope = 1)+
   geom_smooth(method = "lm", formula = y~x)+
   geom_point()+
   theme_bw()+
@@ -263,7 +268,7 @@ library(ggpubr)
 p1 <- anoxic_on_off %>%
   filter(!is.na(mixing_date), !is.na(strat_end_model)) %>%
   ggplot(aes(x = mixing_date, y = strat_end_model))+
-  geom_abline(slope = 1)+
+  #geom_abline(slope = 1)+
   geom_smooth(method = "lm")+
   geom_point()+
   xlab("Stratification end (between profiles)") + 
@@ -274,7 +279,7 @@ p1 <- anoxic_on_off %>%
 p2 <- anoxic_on_off %>%
   filter(!is.na(mixing_date), !is.na(strat_end_new_model)) %>%
   ggplot(aes(x = mixing_date, y = strat_end_new_model))+
-  geom_abline(slope = 1)+
+  #geom_abline(slope = 1)+
   geom_smooth(method = "lm")+
   geom_point()+
   xlab("Stratification end (between profiles)") + 

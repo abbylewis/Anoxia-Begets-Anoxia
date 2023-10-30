@@ -5,7 +5,7 @@ date: "2022-11-22"
 output: html_document
 ---
 
-This file loads temp/DO/productivity data and calculates mean concentrations of each focal variable during the late-summer period (July 15-Aug 31 in the Northern Hemisphere). Functionally, all of the code here will be very similar to "03 - Stratified avgs.Rmd", except that that file is for the whole stratified period and this file is ONLY for the late-summer period. All code chunks must be run in order.
+This file loads temp/DO/productivity data and calculates mean concentrations of each focal variable during the late-summer period (July 15-Aug 31 in the Northern Hemisphere). Functionally, all of the code here will be very similar to "03 - Stratified avgs.Rmd", except that this file is ONLY for the late-summer period, whereas that file is for the whole stratified period. All code chunks must be run in order.
 
 Table of contents:
 Step 1: Load data and packages
@@ -13,7 +13,6 @@ Step 2: QAQC
 Step 3: Filter to stratified period and calculate thermocline depths
 Step 4: Calculate average values within each layer
 Step 5: Add buoyancy frequency during the late-summer period
-Step 6: Calculate the percentage of the water column that is anoxic each year
 
 
 Step 1: Load data and packages
@@ -172,66 +171,4 @@ summer_avgs <- summer_avgs%>%
 
 #All done!
 write.csv(summer_avgs, "../Compiled data/summer_averages_wi.csv", row.names = F)
-```
-
-
-Step 6: Calculate the percentage of the water column that is anoxic each year
-```{r}
-## Load bathymetry data
-lake_bats.raw <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/ba733454c29a5f026efed05a6e6ef75b")%>%
-  filter(Area_m2>0)
-useprofiles <- summer_layers
-
-#Prepare bathymetry data
-#If there is only modeled bathymetry, use that. Otherwise, use contributed data
-hasonlyonemethod <-lake_bats.raw %>% dplyr::select(LakeID,Method) %>% unique() %>% group_by(LakeID) %>% summarize(methods=n()) %>% filter(methods!=2)
-lake_bats <- rbind(
-  lake_bats.raw %>% 
-    filter(Method=="data") ,
-  lake_bats.raw %>% 
-    filter(Method == "model" ) %>%  
-    filter(LakeID %in% hasonlyonemethod$LakeID)
-  )
-
-#Set threshold of anoxia
-o2thresh<-1 #mg/L
-
-#Find the top depth where DO is below the threshold (firstbelowthresh)
-tl_percent_anoxic_and_oxic <- useprofiles[,] %>%  
-  mutate(year=year(Date)) %>% 
-  group_by(LakeID) %>%  
-  mutate(depth_max=max(Depth_m)+1) %>% #find deepest sampling point for each lake, add 1 to get the sediment depth
-  ungroup() %>% 
-  group_by(LakeID,year, Depth_m,depth_max) %>% 
-  dplyr::summarise(DO_mgL = mean(DO_mgL, na.rm = T))%>%
-  group_by(LakeID,year)%>%
-  filter(DO_mgL<o2thresh) %>%
-  dplyr::summarize(firstbelowthresh = min(Depth_m),
-            maxdepths=max(depth_max))
-
-#Calculate affected sediment area
-areal <- tl_percent_anoxic_and_oxic  %>%
-  mutate(Depth_m=ceiling(firstbelowthresh)) %>% #highest anoxic depth (according to the threshold above)
-  dplyr::select(-firstbelowthresh) %>% 
-  left_join(lake_bats %>% 
-              dplyr::select(LakeID,Area_m2,Depth_m),by=c("LakeID","Depth_m")) %>%
-  left_join(lake_bats %>% 
-              filter(Depth_m==0) %>% 
-              rename(area.full=Area_m2) %>% 
-              dplyr::select(LakeID,area.full),by=c("LakeID"))%>%
-  mutate(depth_ratio = (maxdepths-Depth_m)/maxdepths,
-         areal_anoxia = Area_m2/area.full)%>%
-  dplyr::select(LakeID, year, areal_anoxia, depth_ratio)%>%
-  rename(Year=year)
-
-#maxdepths is the depth of the lake
-#Depth_m is the top depth below the anoxia threshhold in a given year (1m intervals)
-#Area_m2 is the area of the top of anoxia
-#area.full is the surface area of the lake
-
-write.csv(areal,"../Compiled data/anoxic_bathymetry.csv", row.names = F)
-
-#Lakes with funky oxygen profiles
-summer_layers%>%
-  filter(LakeID=="296", year(Date)==2001) #389, 5, 252, 296
 ```

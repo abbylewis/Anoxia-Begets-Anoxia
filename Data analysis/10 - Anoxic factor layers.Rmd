@@ -8,6 +8,15 @@ output: html_document
 This file calculates anoxic factor for each lake-year using two distinct hypolimnetic layers. 
 
 Step 1: Load data and packages
+Step 2: Calculate VW DO
+Step 3: Model end of stratification date
+Step 4: Model start of anoxia date using oxygen demand
+Step 5: Empirically calculate start of anoxia if it can be determined within a certain range (PROXIMITY)
+Step 6: Calculate AF, combining all info
+Step 7: Compare AF from one- vs two-layer methods
+
+
+Step 1: Load data and packages
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
@@ -63,6 +72,51 @@ vw_do <- full_with_thermo%>%
   mutate(Year = year(Date))
 ```
 
+
+Step 3: Model end of stratification date
+```{r}
+# Calculate strat end if it can be determined within a certain range (PROXIMITY)
+PROXIMITY = 7
+
+empirical_strat_end <- full_with_thermo%>%
+  full_join(lake_bats, by = c("LakeID","Depth_m"))%>%
+  group_by(Date, LakeID)%>%
+  dplyr::summarize(mixing_date = unique(Date_end)) %>%
+  mutate(Year= year(Date))%>%
+  group_by(LakeID, Year)%>%
+  filter(Date == last(Date[Date <= as.Date(mixing_date)])) %>%
+  mutate(strat_interval = as.numeric(as.Date(mixing_date) - Date),
+         mixing_date = yday(mixing_date) - (strat_interval/2)) %>%
+  filter(strat_interval <= PROXIMITY) %>%
+  select(LakeID, Year, mixing_date)
+
+#New model incorporating year
+for_new_model <- annual_data %>%
+  full_join(empirical_strat_end) %>%
+  dplyr::select(mixing_date, Temp_C_HYPO, MeanDepth_m, Latitude_DD, Year, LakeID) %>%
+  drop_na()
+
+length(unique(for_new_model$LakeID))
+nrow(for_new_model)
+
+new_model <- lm(log10(for_new_model$mixing_date) ~ log10(for_new_model$Temp_C_HYPO) +
+     log10(for_new_model$MeanDepth_m) +
+     for_new_model$Latitude_DD +
+     for_new_model$Year)
+
+#Generate predictions
+new_strat_end_model <- annual_data %>%
+  mutate(strat_end_new_model = 10^(new_model$coefficients[1] + 
+                                 (new_model$coefficients[2] * log10(Temp_C_HYPO)) + 
+                                 (new_model$coefficients[3] * log10(MeanDepth_m)) + 
+                                 (new_model$coefficients[4] * Latitude_DD) +
+                                 (new_model$coefficients[5] * Year)
+                                 )) %>%
+  dplyr::select(LakeID, Year, strat_end_new_model) %>%
+  unique()
+```
+
+
 Step 4: Model start of anoxia date using oxygen demand
 ```{r}
 #Calculate the rate of change in volume-weighted concentrations using lm
@@ -102,54 +156,17 @@ vw_do_demand_qaqc <- removed_by_pos%>%
   filter(LakeID %in% good_hod$LakeID)
 ```
 
-Step 5: Empirically calculate start and end of anoxia date if it can be determined within a certain range (PROXIMITY)
-```{r}
-PROXIMITY = 7
 
-empirical_strat_end <- full_with_thermo%>%
-  full_join(lake_bats, by = c("LakeID","Depth_m"))%>%
-  group_by(Date, LakeID)%>%
-  dplyr::summarize(mixing_date = unique(Date_end)) %>%
-  mutate(Year= year(Date))%>%
-  group_by(LakeID, Year)%>%
-  filter(Date == last(Date[Date <= as.Date(mixing_date)])) %>%
-  mutate(strat_interval = as.numeric(as.Date(mixing_date) - Date),
-         mixing_date = yday(mixing_date) - (strat_interval/2)) %>%
-  filter(strat_interval <= PROXIMITY) %>%
-  select(LakeID, Year, mixing_date)
-```
-
-Develop new model that includes year
-```{r}
-for_new_model <- annual_data %>%
-  full_join(empirical_strat_end) %>%
-  dplyr::select(mixing_date, Temp_C_HYPO, MeanDepth_m, Latitude_DD, Year, LakeID) %>%
-  drop_na()
-
-new_model <- lm(log10(for_new_model$mixing_date) ~ log10(for_new_model$Temp_C_HYPO) +
-     log10(for_new_model$MeanDepth_m) +
-     for_new_model$Latitude_DD +
-     for_new_model$Year)
-
-new_strat_end_model <- annual_data %>%
-  mutate(strat_end_new_model = 10^(new_model$coefficients[1] + 
-                                 (new_model$coefficients[2] * log10(Temp_C_HYPO)) + 
-                                 (new_model$coefficients[3] * log10(MeanDepth_m)) + 
-                                 (new_model$coefficients[4] * Latitude_DD) +
-                                 (new_model$coefficients[5] * Year)
-                                 )) %>%
-  dplyr::select(LakeID, Year, strat_end_new_model) %>%
-  unique()
-```
-
-Step 5: Empirically calculate start and end of anoxia date if it can be determined within a certain range (PROXIMITY)
+Step 5: Empirically calculate start of anoxia if it can be determined within a certain range (PROXIMITY)
 ```{r}
 PROXIMITY = 7
 
 empirical_anoxic_onset <- vw_do %>%
   group_by(LakeID, Year, hypo_strata) %>%
   filter(sum(DO_mgL_vol < DO_THRESH, na.rm = T) >= 1,
-         sum(DO_mgL_vol > DO_THRESH, na.rm = T) >= 1) %>%
+         sum(DO_mgL_vol >= DO_THRESH & 
+               Date < first(Date[DO_mgL_vol < DO_THRESH]), 
+             na.rm = T) >= 1) %>%
   mutate(onset = first(Date[DO_mgL_vol < DO_THRESH]),
          before = last(Date[Date<onset]),
          interval = as.numeric(onset-before),
@@ -157,7 +174,11 @@ empirical_anoxic_onset <- vw_do %>%
          fraction = (DO_mgL_vol[Date==before] - DO_THRESH) / range) %>%
   filter(interval <= PROXIMITY) %>%
   summarize(anoxic_onset_data = unique(yday(before) + fraction * interval)) 
+```
 
+
+Step 6: Calculate AF, combining all info
+```{r}
 breaks <- full_with_thermo %>%
   full_join(lake_bats, by = c("LakeID","Depth_m"))%>%
   filter(!is.na(MaximumDepth_m),
@@ -196,6 +217,8 @@ AF_two_layer <- vw_do_demand_qaqc %>%
 write.csv(AF_two_layer, "../Compiled data/AF - two layers.csv", row.names = F)
 ```
 
+
+Step 7: Compare AF from one- vs. two-layer methods
 ```{r}
 AF <- read_csv("../Compiled data/AF.csv")
 
@@ -213,7 +236,7 @@ AF %>%
   geom_point(alpha = 0.3)+ 
   xlab("Anoxic factor (one layer)")+
   ylab("Anoxic factor (two layer)")+
-  geom_abline(slope = 1)+
+  #geom_abline(slope = 1)+
   geom_smooth(method = "lm")+
   theme_bw()+
   stat_regline_equation(aes(label =  paste(after_stat(eq.label), 
@@ -221,4 +244,3 @@ AF %>%
                                            sep = "~~~~~~~")))
 dev.off()
 ```
-
