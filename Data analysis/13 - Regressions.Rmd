@@ -436,8 +436,6 @@ incomplete <- all_lakes_chla%>%
   dplyr::select(strat_TP_ugL_EPI,LakeID)%>%
   full_join(all_lakes_epiP%>%
               dplyr::select(TP_ugL_HYPO, hypo_p_lag,LakeID))%>%
-  full_join(all_lakes_hypoP%>%
-              dplyr::select(DO_mgL_HYPO,LakeID))%>%
   full_join(all_lakes_do%>%
               dplyr::select(DO_demand_mgLd_HYPO,spring_temp,LakeID))%>%
   full_join(all_lakes_vhod%>%
@@ -497,7 +495,7 @@ for_mlr <- incomplete%>%
          log_af = log(mean_af),
          SA_depth = log_SurfaceArea_ha/log_MaximumDepth_m,
          Lake_type = factor(Lake_type),
-         tn_tp_ratio = mean_epi_n/mean_epi_p,
+         tn_tp_molar_ratio = (mean_epi_n/14.01)/(mean_epi_p/30.97),
          log_dynamic_ratio = log(MeanDepth_m/sqrt(SurfaceArea_ha)))
 
 potential_drivers <- c("log_MeanDepth_m",
@@ -563,10 +561,10 @@ dev.off()
 jpeg("../Figures/Effect of TP on chl-a - TNTP ratio.jpg", width = 6, height = 4, res = 300, units = "in")
 for_mlr%>%
   filter(!is.na(strat_TP_ugL_EPI))%>%
-  mutate(ratio = ifelse(tn_tp_ratio>44,"P limited (TN:TP > 44)",
-                        ifelse(tn_tp_ratio<12,"N limited (TN:TP < 12)","Co-limited")),
+  mutate(ratio = ifelse(tn_tp_molar_ratio>110,"P limited (TN:TP > 110)",
+                        ifelse(tn_tp_molar_ratio<44,"N limited (TN:TP < 44)","Co-limited")),
          ratio = ifelse(is.na(ratio),"Insufficient data",ratio),
-         ratio = factor(ratio,levels = c("N limited (TN:TP < 12)","Co-limited","P limited (TN:TP > 44)","Insufficient data")))%>%
+         ratio = factor(ratio,levels = c("N limited (TN:TP < 44)","Co-limited","P limited (TN:TP > 110)","Insufficient data")))%>%
   ggplot(aes(x = mean_epi_p, y = strat_TP_ugL_EPI, color = ratio))+
   geom_smooth(method = "lm", color = "black")+
   geom_point()+
@@ -588,8 +586,8 @@ for_mlr%>%
   scale_y_log10()+
   theme_bw()+
   ylab("SD")+
-  xlab("Mean epi. TP (µg/L)")+
-  ylab("SD epi. TP (µg/L)")
+  xlab("Mean epilimnetic TP (µg/L)")+
+  ylab("SD epilimnetic TP (µg/L)")
 dev.off()
 
 potential_drivers <- c("log_MeanDepth_m",
@@ -651,6 +649,24 @@ dev.off()
 
 summary(lm(DO_demand_mgLd_HYPO_af ~ log10(MeanDepth_m), data = for_mlr))
 summary(lm(DO_demand_mgLd_HYPO_af ~ log10(MeanDepth_m), data = for_mlr %>% filter(MeanDepth_m > 1, MeanDepth_m < 15)))
+
+jpeg("../Figures/VHOD mean and depth.jpg", width = 4, height = 4, res = 300, units = "in")
+for_mlr%>%
+  filter(!is.na(mean_demand),
+         !is.na(MeanDepth_m))%>%
+  ggplot(aes(x=MeanDepth_m,y=mean_demand))+
+  geom_point()+
+  geom_smooth(method = "lm", color = "black")+
+  scale_x_log10()+
+  #scale_y_log10()+
+  theme_bw()+
+  ylab("SD")+
+  xlab("Mean depth (m)")+
+  ylab("Mean oxygen demand (mg/L/d)")+
+  annotate("text",x = 3, y = 0.5,
+           label = paste0("R^2 == ",r2_value_text,"~~~p ", p_value_text), 
+           parse = TRUE)
+dev.off()
 
 potential_drivers <- c("log_MeanDepth_m",
                       "log_MaximumDepth_m",
