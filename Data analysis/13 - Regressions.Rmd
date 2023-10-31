@@ -625,6 +625,17 @@ r2_value = summary(lm(DO_demand_mgLd_HYPO_af~log_MeanDepth_m,
                       ))$r.squared
 r2_value_text = round(r2_value,2)
 
+# Identify influential points
+row.names(for_mlr) <- for_mlr$LakeID
+model <- lm(DO_demand_mgLd_HYPO_af ~ log10(MeanDepth_m), data = for_mlr)
+cooksD <- cooks.distance(model)
+influential <- cooksD[(cooksD > (3 * mean(cooksD, na.rm = TRUE)))]
+influential_lakes <- names(influential)
+
+summary(lm(DO_demand_mgLd_HYPO_af ~ log10(MeanDepth_m), data = for_mlr))
+summary(lm(DO_demand_mgLd_HYPO_af ~ log10(MeanDepth_m), data = for_mlr %>% filter(!LakeID %in% influential_lakes)))
+length(unique(influential_lakes))
+
 jpeg("../Figures/Effect of VHOD on AF.jpg", width = 4, height = 4, res = 300, units = "in")
 demand_af <- for_mlr%>%
   filter(!is.na(DO_demand_mgLd_HYPO_af),
@@ -633,7 +644,7 @@ demand_af <- for_mlr%>%
   geom_point(color = "grey50")+
   geom_smooth(method = "lm", color = "black")+
   geom_smooth(method = "lm", color = "black", lty = "31",
-              data = . %>% filter(MeanDepth_m > 1, MeanDepth_m < 15))+
+              data = . %>% filter(!LakeID %in% influential_lakes))+
   scale_x_log10()+
   geom_hline(yintercept = 0)+
   theme_bw()+
@@ -646,9 +657,6 @@ demand_af <- for_mlr%>%
            parse = TRUE)
 demand_af
 dev.off()
-
-summary(lm(DO_demand_mgLd_HYPO_af ~ log10(MeanDepth_m), data = for_mlr))
-summary(lm(DO_demand_mgLd_HYPO_af ~ log10(MeanDepth_m), data = for_mlr %>% filter(MeanDepth_m > 1, MeanDepth_m < 15)))
 
 jpeg("../Figures/VHOD mean and depth.jpg", width = 4, height = 4, res = 300, units = "in")
 for_mlr%>%
