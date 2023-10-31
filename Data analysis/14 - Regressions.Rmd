@@ -209,27 +209,29 @@ selected_drivers <- c("TP_ugL_HYPO","hypo_p_lag","epi_p_lag","spring_precip","su
 std_data <- standardize_data(data_log_nuts,responses,selected_drivers)
 all_lakes_epiP <- mod_by_lake(data_log_nuts,responses,selected_drivers, interaction = "+")
 mod_lmer <- lmer(strat_TP_ugL_EPI~TP_ugL_HYPO+hypo_p_lag+epi_p_lag+spring_precip+summer_precip+strat_TP_date_EPI+(1|LakeID), data = std_data)
+mod_lmer
 vif(mod_lmer)
 epi_p <- plot_effects_lmer(mod_lmer,"Epilimnetic TP (µg/L)", poster = POSTER) 
 epi_p_ridge <- plot_effects_by_lake_lmer_ridge(all_lakes_epiP,"Epilimnetic TP (µg/L)",mod_lmer, poster = POSTER)
 
 ### TP with AF
 responses <- c("TP_ugL_HYPO")
-potential_drivers <- c("strat_TP_ugL_EPI",
-                      "strat_buoyancy_freq_EPI",
-                      "strat_Temp_C_HYPO",
-                      "spring_precip",
-                      "summer_precip",
-                      "winter_precip",
-                      "TP_date_HYPO",
-                      "AF"
-                      )
+potential_drivers <- c("AF",
+                       "strat_TP_ugL_EPI",
+                       "strat_buoyancy_freq_EPI",
+                       "strat_Temp_C_HYPO",
+                       "spring_precip",
+                       "summer_precip",
+                       "winter_precip",
+                       "TP_date_HYPO"
+                       )
 aic_calculator_lmer(data_log_nuts,responses,potential_drivers, interaction = "+")
 selected_drivers <- c("strat_TP_ugL_EPI","AF", "winter_precip")
 std_data <-standardize_data(data_log_nuts,responses,selected_drivers)
 all_lakes_hypoP_af <- mod_by_lake(data_log_nuts,responses,selected_drivers, interaction = "+")
 mod_lmer <- lmer(TP_ugL_HYPO~strat_TP_ugL_EPI+AF+winter_precip+(1|LakeID), data = std_data)
 vif(mod_lmer)
+mod_lmer
 hypo_p_af <- plot_effects_lmer(mod_lmer,"Hypolimnetic TP (µg/L)", poster = POSTER) 
 hypo_p_ridge_af <- plot_effects_by_lake_lmer_ridge(all_lakes_hypoP_af,"Hypolimnetic TP (µg/L)",mod_lmer, poster = POSTER)
 
@@ -249,7 +251,7 @@ selected_drivers <- c("spring_temp","strat_TP_ugL_EPI")
 std_data <- standardize_data(data_log_nuts,responses,selected_drivers)
 all_lakes_chla <- mod_by_lake(data_log_nuts,responses,selected_drivers, interaction = "+")
 mod_lmer <- lmer(Chla_ugL_EPI~spring_temp+strat_TP_ugL_EPI+(1|LakeID), data = std_data) 
-summary(mod_lmer)
+mod_lmer
 vif(mod_lmer)
 epi_chla <- plot_effects_lmer(mod_lmer,"Epilimnetic chl-a (µg/L)", poster = POSTER) 
 epi_chla_ridge <- plot_effects_by_lake_lmer_ridge(all_lakes_chla,"Epilimnetic chl-a (µg/L)",mod_lmer, poster = POSTER)
@@ -545,14 +547,14 @@ jpeg("../Figures/Effect of TP on chl-a.jpg", width = 4, height = 4, res = 300, u
 chla <- for_mlr%>%
   filter(!is.na(strat_TP_ugL_EPI))%>%
   ggplot(aes(x=mean_epi_p,y=strat_TP_ugL_EPI))+
+  geom_point(color = "grey50")+
   geom_smooth(method = "lm", color = "black")+
-  geom_point(color = "grey20")+
   scale_x_log10()+
   geom_hline(yintercept = 0)+
   theme_bw()+
   ylab("Coefficient for the\neffect of epi. TP on chl-a")+
   xlab("Mean epilimnetic TP (µg/L)")+
-  annotate("text",x = 8, y = 0.87,
+  annotate("text", x = 8, y = 0.87,
            label = paste0("R^2 == ",r2_value_text,"~~~p ", p_value_text), 
            parse = TRUE)
 chla
@@ -565,7 +567,7 @@ for_mlr%>%
                         ifelse(tn_tp_ratio<12,"N limited (TN:TP < 12)","Co-limited")),
          ratio = ifelse(is.na(ratio),"Insufficient data",ratio),
          ratio = factor(ratio,levels = c("N limited (TN:TP < 12)","Co-limited","P limited (TN:TP > 44)","Insufficient data")))%>%
-  ggplot(aes(x=mean_epi_p,y=strat_TP_ugL_EPI, color = ratio))+
+  ggplot(aes(x = mean_epi_p, y = strat_TP_ugL_EPI, color = ratio))+
   geom_smooth(method = "lm", color = "black")+
   geom_point()+
   scale_x_log10()+
@@ -596,60 +598,11 @@ potential_drivers <- c("log_MeanDepth_m",
                       "log_dynamic_ratio",
                       "log_Res_time",
                       "Elevation_m",
-                      "mean_do"
-                      )
-responses <- c("DO_mgL_HYPO")
-aic_calculator_onevar(for_mlr,responses,potential_drivers)
-summary(lm(DO_mgL_HYPO~mean_do, data = for_mlr)) #Take home: potentially a relationship with DO, but this is not part of the main ABA analysis (we use AF instead)
-
-potential_drivers <- c("log_MeanDepth_m",
-                      "log_MaximumDepth_m",
-                      "log_SurfaceArea_ha",
-                      "log_dynamic_ratio",
-                      "log_Res_time",
-                      "Elevation_m",
                       "log_af"
                       )
 responses <- c("AF")
 aic_calculator_onevar(for_mlr,responses,potential_drivers)
 summary(lm(AF~log_Res_time, data = for_mlr)) #Take home: nothing comes out cleanly
-
-potential_drivers <- c("log_MeanDepth_m",
-                      "log_MaximumDepth_m",
-                      "log_SurfaceArea_ha",
-                      "log_Res_time",
-                      "log_dynamic_ratio",
-                      "Elevation_m",
-                      "mean_demand"
-                      )
-responses <- c("DO_demand_mgLd_HYPO")
-aic_calculator_onevar(for_mlr,responses,potential_drivers)
-summary(lm(DO_demand_mgLd_HYPO~log_SurfaceArea_ha, data = for_mlr)) #Take home: surface area is most important
-
-p_value = summary(lm(DO_demand_mgLd_HYPO~log_SurfaceArea_ha, data = for_mlr%>%filter(MaximumDepth_m<50)))$coefficients[,4][2]
-if(p_value < 0.001){p_value_text = "< 0.001"}else{p_value_text = paste0("== ",as.character(round(p_value,3)))}
-r2_value = summary(lm(DO_demand_mgLd_HYPO~log_SurfaceArea_ha, data = for_mlr%>%filter(MaximumDepth_m<50)))$r.squared
-r2_value_text = round(r2_value,2)
-
-jpeg("../Figures/Effect of VHOD on DO.jpg", width = 4, height = 4, res = 300, units = "in")
-demand <- for_mlr%>%
-  filter(!is.na(DO_demand_mgLd_HYPO),
-         !is.na(SurfaceArea_ha))%>%
-  ggplot(aes(x=SurfaceArea_ha,y=DO_demand_mgLd_HYPO))+
-  geom_smooth(method = "lm", color = "black", data = .%>%filter(MaximumDepth_m<50))+
-  geom_point(aes(color = MaximumDepth_m, shape = MaximumDepth_m>50))+
-  scale_x_log10()+
-  geom_hline(yintercept = 0)+
-  theme_bw()+
-  scale_color_viridis_c(trans = "log", breaks = c(25,50,100,200), name = "Maximum\ndepth (m)")+
-  ylab("Coefficient for the\neffect of VHOD on DO")+
-  xlab("Surface area (ha)")+
-  guides(shape = "none") +
-  annotate("text",x = 5000, y = 0.73,
-           label = paste0("R^2 == ",r2_value_text,"~~~p ", p_value_text), 
-           parse = TRUE)
-demand
-dev.off()
 
 potential_drivers <- c("log_MeanDepth_m",
                       "log_MaximumDepth_m",
@@ -678,9 +631,11 @@ jpeg("../Figures/Effect of VHOD on AF.jpg", width = 4, height = 4, res = 300, un
 demand_af <- for_mlr%>%
   filter(!is.na(DO_demand_mgLd_HYPO_af),
          !is.na(MeanDepth_m))%>%
-  ggplot(aes(x=MeanDepth_m,y=DO_demand_mgLd_HYPO_af))+
-  geom_smooth(method = "lm", color = "black")+ #, data = . %>% filter(MeanDepth_m > 1))+
-  geom_point()+
+  ggplot(aes(x = MeanDepth_m, y = DO_demand_mgLd_HYPO_af))+
+  geom_point(color = "grey50")+
+  geom_smooth(method = "lm", color = "black")+
+  geom_smooth(method = "lm", color = "black", lty = "31",
+              data = . %>% filter(MeanDepth_m > 1, MeanDepth_m < 15))+
   scale_x_log10()+
   geom_hline(yintercept = 0)+
   theme_bw()+
@@ -693,6 +648,9 @@ demand_af <- for_mlr%>%
            parse = TRUE)
 demand_af
 dev.off()
+
+summary(lm(DO_demand_mgLd_HYPO_af ~ log10(MeanDepth_m), data = for_mlr))
+summary(lm(DO_demand_mgLd_HYPO_af ~ log10(MeanDepth_m), data = for_mlr %>% filter(MeanDepth_m > 1, MeanDepth_m < 15)))
 
 potential_drivers <- c("log_MeanDepth_m",
                       "log_MaximumDepth_m",
@@ -719,25 +677,11 @@ vhod <- for_mlr%>%
   geom_hline(yintercept = 0)+
   ylab("Coefficient for the\neffect of chl-a (t-1) on VHOD")+
   xlab("Residence time (d)")+
+  geom_point(color = "grey50")+
   geom_smooth(method = "lm",color = "black")+
-  geom_point(color = "grey20")+
   annotate("text",x = 250, y = 0.73,
            label = paste0("R^2 == ",r2_value_text,"~~~p ", p_value_text), 
            parse = TRUE)
-
-jpeg("../Figures/Driver analysis.jpg", width = 7, height = 5, res = 300, units = "in")
-ggarrange(ggarrange(chla,
-                    vhod,
-                    labels = c("A","B"),
-                    label.x = -0.01),
-          ggarrange(demand,
-                    ggplot()+geom_blank()+theme_minimal(),
-                    labels = c("C", NA),
-                    label.x = -0.005,
-                    widths = c(0.64,0.36)),
-          nrow = 2
-          )
-dev.off()
 
 jpeg("../Figures/Driver analysis AF.jpg", width = 7, height = 5, res = 300, units = "in")
 ggarrange(ggarrange(chla,
@@ -763,20 +707,22 @@ total <- with_temp%>%
   filter(length(unique(Year))>=10)%>%
   ungroup()%>%
   summarize(length(unique(LakeID)))
+total$`length(unique(LakeID))`
 
 anoxic <- with_temp%>%
   filter(!is.na(DO_mgL_HYPO))%>%
   group_by(LakeID)%>%
   filter(length(unique(Year))>=10,
-         max(DO_mgL_HYPO)<1)%>%
+         max(DO_mgL_HYPO) < 1.8)%>%
   ungroup()
 length(unique(anoxic$LakeID))
+length(unique(anoxic$LakeID))/total$`length(unique(LakeID))`
 
 oxic <- with_temp%>%
   filter(!is.na(DO_mgL_HYPO))%>%
   group_by(LakeID)%>%
   filter(length(unique(Year))>=10,
-         min(DO_mgL_HYPO)>1)%>%
+         min(DO_mgL_HYPO) > 1.8)%>%
   ungroup()
 length(unique(oxic$LakeID))
 
@@ -784,8 +730,8 @@ switch <- with_temp%>%
   filter(!is.na(DO_mgL_HYPO))%>%
   group_by(LakeID)%>%
   filter(length(unique(Year))>=10,
-         min(DO_mgL_HYPO)<1,
-         max(DO_mgL_HYPO)>1
+         min(DO_mgL_HYPO) < 1.8,
+         max(DO_mgL_HYPO) >= 1.8
          )%>%
   ungroup()
 length(unique(switch$LakeID))
@@ -829,7 +775,7 @@ dev.off()
 
 status_data_do <- status_data%>%
   filter(!is.na(DO_mgL_HYPO),
-         abs(Year-anoxic_date)<=1)%>%
+         abs(Year-anoxic_date) <= 1)%>%
   group_by(LakeID)%>%
   mutate(n = n())%>%
   filter(n == 3)
