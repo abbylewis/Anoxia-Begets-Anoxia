@@ -1,0 +1,1138 @@
+---
+title: "Mixed effect regressions"
+author: "Abby Lewis"
+date: "2023-05-22"
+output: html_document
+---
+
+This file re-runs the analyses described in all previous code files, but with a lower depth-cutoff for inclusion (3 m or greater, rather than ≥ 6.4 m). I do this by processing data for lakes between 3 and 6.4 m depth, then combining with the files generated elsewhere.
+
+Step 1: Load all packages
+Step 2: QAQC
+Step 3: Interpolate DO, following Jane et al. (2021)
+Step 4: Interpolate temp
+Step 5: Combine DO and temp
+Step 6: Load productivity data
+Step 7: Filter to stratified period
+Step 8: Calculate metalimetic boundaries and average values within each layer
+Step 9: Add buoyancy frequency, hypolimnetic SA:vol ratio, and chl-a during the stratified period
+Step 10: Filter to late-summer period and calculate thermocline depths
+Step 11: Calculate average values within each layer
+Step 12: Add buoyancy frequency during the late-summer period
+Step 13: Calculate the rate of change in volume-weighted oxygen concentrations during the stratified period at each lake (VHOD)
+Step 14: Compile all in-lake data
+Step 15: Add climate data
+Step 16: Anoxic factor- Calculate VW DO
+Step 17: Anoxic factor- Model end of stratification date
+Step 18: Anoxic factor- Model start of anoxia date using oxygen demand
+Step 19: Anoxic factor- Empirically calculate start of anoxia date if it can be determined within a certain range (PROXIMITY)
+Step 20: Calculate AF, combining all info
+Step 21: Anoxic factor- If VW DO is high all summer, AF = 0
+Step 22: Format data for regressions
+Step 23: Model selection
+Step 24: Generate combined figures
+
+
+Step 1: Load all packages
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readxl)
+library(lubridate)
+library(pracma)
+library(tidyverse)
+library(ggpubr)
+library(MuMIn)
+library(car)
+library(lme4)
+library(ggpubr)
+library(ggridges)
+library(gtable)
+library(gridExtra)
+library(grid)
+library(ggh4x)
+library(segmented)
+library(ggpmisc)
+library(rLakeAnalyzer)
+library(openair)
+source("thermo.depth.density.R")
+source("lmer_functions.R")
+
+POSTER = F #Set global option: Should figures be designed for a poster? Or for the manuscript
+set.seed(47) #Set seed so points jitter the same way each time
+```
+
+
+Step 2: QAQC
+```{r}
+#import data
+to_profiles_all <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/caf59a118a1490e7cb1a219c55b920f9")
+to_profiles_all$Date <- as.Date(to_profiles_all$Date)
+lat_long <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/fadd3eaa25b5fdd1fc4efba70e660579") #Metadata
+
+#Filter to only lakes between 3 and 6.4 m depth, which we will be adding
+to_profiles <- to_profiles_all%>%
+  left_join(lat_long, by = c("LakeID"))%>%
+  filter(is.na(MaximumDepth_m)|(MaximumDepth_m>3&MaximumDepth_m<6.4))%>%
+  rename(reported_max_depth = MaximumDepth_m)
+
+#Remove max depth outliers using IQR
+test_depth_removal <- to_profiles%>%
+  group_by(LakeID,Date)%>%
+  mutate(max_depth = max(Depth_m, na.rm = T))%>%
+  group_by(LakeID)%>%
+  filter(is.na(max_depth)|max_depth>=2,
+         abs(max_depth-reported_max_depth)<0.3*reported_max_depth|abs(max_depth-reported_max_depth)<=2
+         )%>%
+  group_by(LakeID)%>%
+  mutate(outlier = (max_depth<(quantile(max_depth,.25)-1.5*IQR(max_depth))|
+                      max_depth>(quantile(max_depth,.75)+1.5*IQR(max_depth)))&
+           (max_depth-quantile(max_depth,.5))>5)%>%
+  filter(!outlier)
+
+#Saving this as our current workflow
+to_profiles_depth_checked <- test_depth_removal%>%
+  dplyr::select(LakeID,Date,Depth_m,Temp_C,DO_sat,DO_mgL,Flag_Temp_C,Flag_DO_mgL)
+```
+
+
+Step 3: Interpolate DO, following Jane et al. (2021) - note that this will take a bit of time to run
+```{r}
+#Prep for interpolation
+
+#Filter to profiles with at least 3 measurements
+to_profiles_cleaning1 <- to_profiles_depth_checked %>%
+  filter(!is.na(DO_mgL))%>%
+  group_by(LakeID,Date) %>% 
+  filter(length(unique(Depth_m)) > 2,#less than three measurement depths
+         )%>%
+  mutate(crit=min(Depth_m)) %>% 
+  ungroup()%>%
+  filter(crit<=3)#remove profiles where the shallowest value is larger than 3
+
+#take care of all the non-zeros
+nozeros<-to_profiles_cleaning1 %>% 
+  group_by(LakeID,Date) %>%
+  mutate(crit=min(Depth_m)) %>% 
+  ungroup()%>%
+  filter(crit!=0)
+
+#change anything Depth <0.5 to 0 (remove them first)
+nozeros_case1<-nozeros %>% 
+  filter(crit<=0.5)%>%
+  mutate(Depth_m = ifelse(Depth_m == crit,0,Depth_m))
+
+#add additional 0m measurement for depths between 0.5 and 3
+nozeros_case2_zeros<-nozeros %>% 
+  filter(crit>0.5) %>% 
+  filter(crit<=3) %>%
+  ungroup()%>%
+  filter(Depth_m==crit)%>%#only take the lowest value
+  mutate(Depth_m=0) %>% unique()
+nozeros_case2 <- nozeros %>% 
+  filter(crit>0.5) %>% 
+  filter(crit<=3) %>%
+  full_join(nozeros_case2_zeros)
+
+to_profiles_cleaning2 <- to_profiles_cleaning1 %>% 
+  filter(crit==0)%>%
+  ungroup() %>%
+  rbind(nozeros_case1)%>%
+  rbind(nozeros_case2) %>% 
+  arrange(LakeID,Date,Depth_m)  %>%
+  group_by(LakeID,Date) %>% 
+  mutate(somany=n_distinct(Depth_m)) %>% 
+  ungroup() %>% filter(somany>=2)%>%
+  dplyr::select(-somany,-crit)
+
+interp_do <- function(lake,to_profiles_cleaning2){
+  message(paste0("Running: ",lake))
+  alldates<-to_profiles_cleaning2 %>% dplyr::select(LakeID,Date,Depth_m,DO_mgL) %>%
+    filter(LakeID==lake) %>%
+    dplyr::select(Date) %>% unique() %>% unlist() %>% as.vector()
+  
+  lake_data <- to_profiles_cleaning2 %>%
+    filter(LakeID==lake)
+  
+  interpolatedvalues.do <- map_df(alldates,run_all_dates_do,lake_data,lake)
+  
+  return(interpolatedvalues.do)
+}
+
+run_all_dates_do <- function(alldates,lake_data,lake){
+  profile <- lake_data %>% filter(Date==alldates)
+  
+  interpolated.depths <- seq(from=0, to= max(profile$Depth_m))
+  
+  datamatrix_<- data.frame(
+    depths=profile$Depth_m,
+    values=profile$DO_mgL)%>%
+    group_by(depths) %>% dplyr::summarize(valuemean=mean(values)) %>% ungroup() %>% as.matrix()
+  
+  interpolated.dos <- pchip(xi= datamatrix_[,1], yi=datamatrix_[,2],x= interpolated.depths  )
+  
+  output <- data.frame(LakeID=lake,
+                      Date=alldates,
+                      Depth_m=interpolated.depths,
+                      DO_mgL=interpolated.dos)
+  return(output)
+}
+laken <- to_profiles_cleaning2$LakeID %>% unique()
+
+interpolatedvalues.do <- map_df(laken,interp_do,to_profiles_cleaning2)
+```
+
+
+Step 4: Interpolate temp - note that this will take a bit of time to run
+```{r}
+#Prep for interpolation
+
+to_profiles_cleaning1 <- to_profiles_depth_checked %>%
+  filter(!is.na(Temp_C))%>%
+  group_by(LakeID,Date) %>% 
+  filter(length(unique(Depth_m)) >2,#less than three measurement depths
+         )%>%
+  mutate(crit=min(Depth_m)) %>% 
+  ungroup()%>%
+  filter(crit<=3)#remove profiles where the lowest value is larger than 3
+
+#take care of all the non-zeros
+nozeros<-to_profiles_cleaning1 %>% 
+  group_by(LakeID,Date) %>%
+  mutate(crit=min(Depth_m)) %>% 
+  ungroup()%>%filter(crit!=0)
+
+#change anything Depth <0.5 to 0 (remove them first)
+nozeros_case1<-nozeros %>% 
+  filter(crit<=0.5)%>%
+  mutate(Depth_m = ifelse(Depth_m == crit,0,Depth_m))
+
+#add additional 0m measurement for depths between 0.5 and 3
+nozeros_case2_zeros<-nozeros %>% 
+  filter(crit>0.5) %>% 
+  filter(crit<=3) %>%
+  ungroup()%>%
+  filter(Depth_m==crit)%>%#only take the lowest value
+  mutate(Depth_m=0) %>% unique()
+nozeros_case2 = nozeros %>% 
+  filter(crit>0.5) %>% 
+  filter(crit<=3) %>%
+  full_join(nozeros_case2_zeros)
+
+to_profiles_cleaning2 <- to_profiles_cleaning1 %>% 
+  filter(crit==0)%>%
+  ungroup() %>%
+  rbind(nozeros_case1)%>%rbind(nozeros_case2) %>% arrange(LakeID,Date,Depth_m)  %>%
+  group_by(LakeID,Date) %>% mutate(somany=n_distinct(Depth_m)) %>% ungroup() %>% filter(somany>=2)%>%dplyr::select(-somany)#less than three measurement depths 
+
+interp_t <- function(lake,to_profiles_cleaning2){
+  message(paste0("Running: ",lake))
+  alldates<-to_profiles_cleaning2 %>% dplyr::select(LakeID,Date,Depth_m,Temp_C)%>%
+    filter(LakeID==lake) %>%
+    dplyr::select(Date) %>% unique() %>% unlist() %>% as.vector()
+  
+  lake_data <- to_profiles_cleaning2 %>%
+    filter(LakeID==lake)
+  
+  interpolatedvalues.do <- map_df(alldates,run_all_dates_t,lake_data,lake)
+  
+  return(interpolatedvalues.do)
+}
+
+run_all_dates_t <- function(alldates,lake_data,lake){
+  profile <- lake_data %>% filter(Date==alldates)
+  
+  interpolated.depths <- seq(from=0, to= max(profile$Depth_m))
+  
+  datamatrix_<- data.frame(
+    depths=profile$Depth_m,
+    values=profile$Temp_C)%>%
+    group_by(depths) %>% dplyr::summarize(valuemean=mean(values)) %>% ungroup() %>% as.matrix()
+  
+  interpolated.dos <- pchip(xi= datamatrix_[,1], yi=datamatrix_[,2],x= interpolated.depths  )
+  
+  output = data.frame(LakeID=lake,
+                      Date=alldates,
+                      Depth_m=interpolated.depths,
+                      Temp_C=interpolated.dos)
+  return(output)
+}
+
+laken<-to_profiles_cleaning2$LakeID %>% unique()
+interpolatedvalues.t <- map_df(laken,interp_t,to_profiles_cleaning2)
+```
+
+
+Step 5: Combine DO and temp
+```{r}
+database.interp<-full_join(interpolatedvalues.t,interpolatedvalues.do,
+          by=c("LakeID","Depth_m","Date"))%>%
+  mutate(Date = as.Date(Date, origin = "1970-01-01"))
+
+## export
+write.csv(database.interp,"../Compiled data/temp_o2_interpolated_3m.csv")
+```
+
+
+Step 6: Load productivity data
+```{r}
+## Load productivity data and metadata from EDI
+p <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/0ece9d7b67cd49741ed7ee60192832e4") 
+#Load interpolated DO data file
+do <- read.csv("../Compiled data/temp_o2_interpolated_3m.csv") %>%
+  mutate(Date = as.Date(Date))
+
+#Merge P, DO, and lake info (from lat long file)
+full <- p%>%
+  mutate(Date = as.Date(Date))%>%
+  full_join(do, by = c("Date","LakeID", "Depth_m"))%>%
+  full_join(lat_long, by = c("LakeID"))%>%
+  mutate(Date = as.Date(Date))%>%
+  filter(is.na(MaximumDepth_m)|(MaximumDepth_m>3&MaximumDepth_m<6.4))
+```
+
+
+Step 7: Filter to stratified period
+```{r}
+#Create a Date_22 column, so that I can filter to only the end of summer
+full$Date_22 <- full$Date
+year(full$Date_22) <-2022
+
+#Remove NAs
+full <- full%>%
+  filter(!is.na(Date),
+         !is.na(Latitude_DD))
+
+###
+#Determine start and end of stratification, then thermo depths
+###
+
+full_format <- full%>%
+  mutate(Date_unif = as.Date(ifelse(Latitude_DD>=0,Date,Date+months(6)),origin = "1970-01-01"))%>%
+  group_by(Date, Date_unif, LakeID, Depth_m)%>%
+  dplyr::summarize(Temp_C = mean(Temp_C, na.rm = T))%>%
+  filter(!is.na(Temp_C))%>%
+  ungroup()%>%
+  group_by(Date, Date_unif, LakeID)%>%
+  dplyr::summarize(epi_depth = meta.depths(Temp_C,Depth_m,mixed.cutoff = 0)[1],
+            hypo_depth = meta.depths(Temp_C,Depth_m,mixed.cutoff = 0)[2],
+            max_depth = max(Depth_m),
+            thermo = thermo.depth.density(Temp_C,Depth_m, mixed.cutoff = 0.1, seasonal = F))%>% #custom thermocline function
+  mutate(Year= year(Date_unif),
+         unstrat = as.numeric(is.na(thermo)))
+#Start of stratification
+date_start <- full_format%>%
+  group_by(Year,LakeID)%>%
+  filter(unstrat==1,
+         month(Date_unif)<=7)%>%
+  filter(Date==max(Date_unif))%>%
+  dplyr::select(Date, Year, LakeID)%>%
+  rename(Date_start = Date)
+#End of stratification
+date_end <- full_format%>%
+  group_by(Year,LakeID)%>%
+  filter(unstrat==1,
+         month(Date_unif)>7)%>%
+  filter(Date==min(Date_unif))%>%
+  dplyr::select(Date, Year, LakeID)%>%
+  rename(Date_end = Date)
+#Stratification duration
+strat_dur <- date_start%>%
+  full_join(date_end)
+
+#Filter to stratified period
+full_trimmed <- full%>%
+  mutate(Date_unif = as.Date(ifelse(Latitude_DD>=0,Date,Date+months(6)),origin = "1970-01-01"),
+         Year = year(Date_unif))%>%
+  full_join(strat_dur)%>%
+  filter(is.na(Date_start)|Date_unif>Date_start,
+         is.na(Date_end)|Date_unif<Date_end,
+         month(Date_unif)>3,
+         month(Date_unif)<11)
+```
+
+
+Step 8: Calculate metalimetic boundaries and average values within each layer
+```{r}
+#Thermocline depths during stratified period
+thermo_depths <- full_format%>%
+  full_join(strat_dur)%>%
+  filter(is.na(Date_start)|Date_unif>Date_start,
+         is.na(Date_end)|Date_unif<Date_end)%>%
+  group_by(Year,LakeID)%>%
+  dplyr::summarize(epi_depth = mean(epi_depth, na.rm = T),
+            hypo_depth = mean(hypo_depth, na.rm = T),
+            count_unstrat = sum(unstrat),
+            n= n())
+
+thermo_depths_sum <- thermo_depths%>%
+  group_by(LakeID)%>%
+  dplyr::mutate(count_unstrat_tot = sum(count_unstrat),
+                n = sum(n))%>%
+  filter((count_unstrat_tot/n) <0.1,
+         count_unstrat == 0)%>%
+  group_by(LakeID,Year)%>%
+  dplyr::summarize(epi_sd = sd(epi_depth, na.rm = T),
+            epi_depth = mean(epi_depth, na.rm = T),
+            hypo_sd = sd(hypo_depth, na.rm = T),
+            hypo_depth = mean(hypo_depth, na.rm = T))
+
+full_with_thermo <- full_trimmed%>%
+  full_join(thermo_depths_sum)%>%
+  filter(!is.na(epi_depth),
+         !is.na(hypo_depth)
+         )
+write.csv(full_with_thermo,"../Compiled data/Stratified_period_data_with_thermo_3m.csv",row.names = F)
+
+summer_layers <- full_with_thermo%>%
+  mutate(Layer = ifelse(!is.na(Depth_m)&Depth_m<epi_depth, "EPI", NA),
+         Layer = ifelse(is.na(Depth_m)&!is.na(Interval)&Interval=="EPILIMNION","EPI",Layer),
+         Layer = ifelse(!is.na(Depth_m)&Depth_m>hypo_depth,"HYPO",Layer),
+         Layer = ifelse(is.na(Depth_m)&!is.na(Interval)&Interval=="HYPOLIMNION","HYPO",Layer),
+         Layer = ifelse(!is.na(Depth_m)&Depth_m<hypo_depth&Depth_m>epi_depth, "META",Layer),
+         Layer = ifelse(is.na(Depth_m)&!is.na(Interval)&Interval=="METALIMNION","META",Layer))%>%
+  filter(!is.na(Layer))
+
+summer_avgs <- summer_layers%>%
+  group_by(LakeID,Year, Layer)%>%
+  mutate(start_date = as.Date(paste0(Year,"-08-01")))%>%
+  dplyr::summarize(TP_ugL = mean(TP_ugL, na.rm = T),
+            TP_date = as.numeric(mean(Date[!is.na(TP_ugL)],na.rm=T)-unique(start_date)),
+            DOC_mgL = mean(DOC_mgL, na.rm = T),
+            DOC_date = as.numeric(mean(Date[!is.na(DOC_mgL)],na.rm=T)-unique(start_date)),
+            DO_mgL = mean(DO_mgL, na.rm = T),
+            DO_date = as.numeric(mean(Date[!is.na(DO_mgL)],na.rm=T)-unique(start_date)),
+            Chla_ugL = mean(Chla_ugL, na.rm = T),
+            Chla_date = as.numeric(mean(Date[!is.na(DO_mgL)],na.rm=T)-unique(start_date)),
+            Temp_C = mean(Temp_C, na.rm = T),
+            Temp_date = as.numeric(mean(Date[!is.na(Temp_C)],na.rm=T)-unique(start_date)),
+            TN_ugL = mean(TN_ugL, na.rm = T),
+            TN_date = as.numeric(mean(Date[!is.na(TN_ugL)],na.rm=T)-unique(start_date)),
+            hypo_depth = unique(hypo_depth))
+```
+
+
+Step 9: Add buoyancy frequency, hypolimnetic SA:vol ratio, and chl-a during the stratified period
+```{r}
+###
+#Calculate buoyancy frequency
+###
+
+buoyancy <- full_trimmed%>%
+  group_by(Date, LakeID, Depth_m)%>%
+  dplyr::summarize(Temp_C = mean(Temp_C, na.rm = T))%>%
+  filter(!is.na(Temp_C))%>%
+  ungroup()%>%
+  group_by(Date, LakeID)%>%
+  dplyr::summarize(buoyancy_freq = max(buoyancy.freq(Temp_C,Depth_m),na.rm=T))%>%
+  mutate(Year=year(Date))%>%
+  group_by(Year,LakeID)%>%
+  dplyr::summarize(buoyancy_freq = mean(buoyancy_freq,na.rm=T))
+#Add to df
+summer_avgs <- summer_avgs%>%
+  left_join(buoyancy)
+
+###
+#Calculate surface area:volume ratio of the hypolimnion
+###
+
+#Load bathymetry
+lake_bats.raw <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/ba733454c29a5f026efed05a6e6ef75b")%>%
+  filter(Area_m2>0)%>%
+  group_by(LakeID)%>%
+  mutate(methods_n = length(unique(Method)))%>%
+  filter(methods_n==1|Method=="model")%>%
+  ungroup()
+#Calculate ratio
+ratio <- thermo_depths_sum%>%
+  mutate(Depth_m = round(hypo_depth))%>%
+  dplyr::select(LakeID,Year,Depth_m)%>%
+  left_join(lake_bats.raw, by = c("LakeID", "Depth_m"))%>%
+  mutate(SA_vol_ratio = Area_m2/CumulativeVolume_m3)%>%
+  dplyr::select(LakeID,Year,SA_vol_ratio)
+#Add to df
+summer_avgs <- summer_avgs%>%
+  left_join(ratio)
+
+###
+#Load published chl-a data
+###
+
+chl <- read.csv("../External data/ChlaData.csv") #https://knb.ecoinformatics.org/view/doi:10.5063/F1JH3JKZ
+lacking_data <- summer_avgs%>%
+  group_by(LakeID)%>%
+  summarize(n = sum(is.na(Chla_ugL)),
+            tot = n())%>%
+  filter(n==tot)
+name_harmonizer <- read.csv("chla_harmonizer.csv") #Manually harmonized lake names
+
+harm_short <- name_harmonizer%>%
+  filter(ID%in%lacking_data$LakeID)%>%
+  filter(nchar(UniqueLakeName)>1)
+
+harm_short%>%filter(lat<0) #don't have to worry about southern hemisphere
+
+published_chla <- chl%>%
+  mutate(Year = as.numeric(Year))%>%
+  filter(UniqueLakeName%in%harm_short$UniqueLakeName)%>%
+  filter(!is.na(Month),
+         (Month%in%5:8&Lat>0)|
+           Month%in%c(11,12,1,2)&Lat<0)%>%
+  left_join(harm_short%>%dplyr::select(ID,UniqueLakeName))%>%
+  rename(LakeID=ID)%>%
+  group_by(LakeID,Year)%>%
+  dplyr::summarise(Chla_ugL = mean(ChlValues,na.rm = T)*1000)%>%
+  mutate(Layer="EPI")
+
+published_chla <- published_chla%>%
+  rename(Chla_ugL_published = Chla_ugL)
+
+#If we do not currently have any Chla data, add published data
+summer_avgs <- summer_avgs%>%
+  full_join(published_chla)%>%
+  mutate(Chla_ugL = ifelse(is.na(Chla_ugL),Chla_ugL_published,Chla_ugL))%>%
+  dplyr::select(-Chla_ugL_published)
+
+#All done!!
+write.csv(summer_avgs,"../Compiled data/stratified_averages_3m.csv")
+```
+
+
+Step 10: Filter to late-summer period and calculate thermocline depths
+```{r}
+full_trimmed <- full%>%
+  filter(((Latitude_DD>0)&Date_22>=as.Date("2022-07-15")&Date_22<=as.Date("2022-08-31"))|
+           ((Latitude_DD<0)&Date_22>=as.Date("2022-01-15")&Date_22<=as.Date("2022-02-28")))%>%
+  dplyr::select(-Date_22)%>%
+  mutate(start_date = ifelse(Latitude_DD>0,"2022-07-15","2022-01-15"))
+
+#Calculate thermocline depths
+thermo_depths <- full_trimmed%>%
+  group_by(Date, LakeID, Depth_m)%>%
+  dplyr::summarize(Temp_C = mean(Temp_C, na.rm = T))%>%
+  filter(!is.na(Temp_C))%>%
+  ungroup()%>%
+  group_by(Date, LakeID)%>%
+  dplyr::summarize(epi_depth = meta.depths(Temp_C,Depth_m,mixed.cutoff = 0)[1],
+            hypo_depth = meta.depths(Temp_C,Depth_m,mixed.cutoff = 0)[2],
+            max_depth = max(Depth_m),
+            thermo = thermo.depth.density(Temp_C,Depth_m, mixed.cutoff = 0.1, seasonal = F))%>% #use custom density threshold function
+  mutate(Year= year(Date),
+         unstrat = as.numeric(is.na(thermo)))%>%
+  group_by(Year,LakeID)%>%
+  dplyr::summarize(epi_depth = mean(epi_depth, na.rm = T),
+            hypo_depth = mean(hypo_depth, na.rm = T),
+            count_unstrat = sum(unstrat),
+            n = n())
+
+#How many are removed by filtering out lakes with 10% of profiles being unstratified?
+thermo_depths%>%
+  group_by(LakeID)%>%
+  dplyr::mutate(count_unstrat_tot = sum(count_unstrat),
+                n = sum(n))%>%
+  filter((count_unstrat_tot/n) >=0.1)%>%
+  ungroup()%>%
+  summarize(lakes = length(unique(LakeID)))
+
+#Remove years with unstratified profiles and lakes where 10% of years have unstratified profiles
+thermo_depths_sum <- thermo_depths%>%
+  group_by(LakeID)%>%
+  dplyr::mutate(count_unstrat_tot = sum(count_unstrat),
+                n = sum(n))%>%
+  filter((count_unstrat_tot/n) <0.1,
+         count_unstrat == 0)%>%
+  group_by(LakeID,Year)%>%
+  dplyr::summarize(epi_sd = sd(epi_depth, na.rm = T),
+            epi_depth = mean(epi_depth, na.rm = T),
+            hypo_sd = sd(hypo_depth, na.rm = T),
+            hypo_depth = mean(hypo_depth, na.rm = T))
+```
+
+
+Step 11: Calculate average values within each layer
+```{r}
+#Add thermocline depths
+full_with_thermo <- full_trimmed%>%
+  mutate(Year = year(Date))%>%
+  full_join(thermo_depths_sum)%>%
+  filter(!is.na(epi_depth),
+         !is.na(hypo_depth),
+         )
+#Add discrete layer designations from data providers
+summer_layers <- full_with_thermo%>%
+  mutate(Layer = ifelse(!is.na(Depth_m)&Depth_m<epi_depth, "EPI", NA),
+         Layer = ifelse(is.na(Depth_m)&!is.na(Interval)&Interval=="EPILIMNION","EPI",Layer),
+         Layer = ifelse(!is.na(Depth_m)&Depth_m>hypo_depth,"HYPO",Layer),
+         Layer = ifelse(is.na(Depth_m)&!is.na(Interval)&Interval=="HYPOLIMNION","HYPO",Layer),
+         Layer = ifelse(!is.na(Depth_m)&Depth_m<hypo_depth&Depth_m>epi_depth, "META",Layer),
+         Layer = ifelse(is.na(Depth_m)&!is.na(Interval)&Interval=="METALIMNION","META",Layer))%>%
+  filter(!is.na(Layer))
+
+#Calculate averages
+summer_avgs <- summer_layers%>%
+  mutate(start_date = as.Date(paste0(year(Date),"-",month(start_date),"-",day(start_date))))%>%
+  group_by(LakeID,Year, Layer)%>% #not separating by measurement location. Is this a problem?
+  dplyr::summarize(TP_ugL = mean(TP_ugL, na.rm = T),
+                   TP_date = as.numeric(mean(Date[!is.na(TP_ugL)],na.rm=T)-unique(start_date)),
+                   DOC_mgL = mean(DOC_mgL, na.rm = T),
+                   DOC_date = as.numeric(mean(Date[!is.na(DOC_mgL)],na.rm=T)-unique(start_date)),
+                   DO_mgL = mean(DO_mgL, na.rm = T),
+                   DO_date = as.numeric(mean(Date[!is.na(DO_mgL)],na.rm=T)-unique(start_date)),
+                   Chla_ugL = mean(Chla_ugL, na.rm = T),
+                   Chla_date = as.numeric(mean(Date[!is.na(DO_mgL)],na.rm=T)-unique(start_date)),
+                   Temp_C = mean(Temp_C, na.rm = T),
+                   Temp_date = as.numeric(mean(Date[!is.na(Temp_C)],na.rm=T)-unique(start_date)),
+                   TN_ugL = mean(TN_ugL, na.rm = T),
+                   TN_date = as.numeric(mean(Date[!is.na(TN_ugL)],na.rm=T)-unique(start_date)))
+```
+
+
+Step 12: Add buoyancy frequency during the late-summer period
+```{r}
+buoyancy <- full_trimmed%>%
+  group_by(Date, LakeID, Depth_m)%>%
+  dplyr::summarize(Temp_C = mean(Temp_C, na.rm = T))%>%
+  filter(!is.na(Temp_C))%>%
+  ungroup()%>%
+  group_by(Date, LakeID)%>%
+  dplyr::summarize(buoyancy_freq = max(buoyancy.freq(Temp_C,Depth_m),na.rm=T))%>%
+  mutate(Year=year(Date))%>%
+  group_by(Year,LakeID)%>%
+  dplyr::summarize(buoyancy_freq = mean(buoyancy_freq,na.rm=T))
+
+summer_avgs <- summer_avgs%>%
+  left_join(buoyancy)
+
+#All done!
+write.csv(summer_avgs, "../Compiled data/summer_averages_wi_3m.csv", row.names = F)
+```
+
+
+Step 13: Calculate the rate of change in volume-weighted oxygen concentrations during the stratified period at each lake (VHOD)
+```{r}
+#Load data and stratification boundaries
+full_with_thermo <- read.csv("../Compiled data/Stratified_period_data_with_thermo_3m.csv")%>%
+  mutate(Date=as.Date(Date))
+
+#prepare bathymetry
+#lake with only one method (data/model)
+lake_bats <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/ba733454c29a5f026efed05a6e6ef75b")%>%
+  filter(Area_m2>0)%>%
+  group_by(LakeID)%>%
+  mutate(methods_n = length(unique(Method)))%>%
+  filter(methods_n==1|Method=="model")%>%
+  ungroup()
+
+#Calculate volume-weighted oxygen concentrations
+vw_do <- full_with_thermo%>%
+  full_join(lake_bats, by = c("LakeID","Depth_m"))%>%
+  filter(!is.na(IntervalVolume_m3))%>%
+  filter(Depth_m>hypo_depth)%>%
+  mutate(DO_mass = DO_mgL*IntervalVolume_m3,
+         Temp_total = Temp_C*IntervalVolume_m3,
+         Year = year(Date))%>%
+  group_by(Date, LakeID)%>%
+  dplyr::summarize(DO_tot = sum(DO_mass),#sum across all hypolimnetic depths
+                   vol_tot = sum(IntervalVolume_m3),
+                   DO_mgL_vol = DO_tot/vol_tot,#Divide by hypolimnetic volume
+                   DO_mgL_area = DO_tot/max(Area_m2),
+                   Temp_C = sum(Temp_total)/vol_tot)%>%
+  mutate(Year= year(Date))%>%
+  group_by(LakeID, Year)%>%
+  filter(!is.na(DO_mgL_vol))%>%
+  arrange(LakeID, Date)%>%
+  mutate(low_point = ifelse(sum(DO_mgL_vol<1)==0,#Identify the lowest DO value for a given year
+                            Date[which.min(DO_mgL_vol)],
+                            first(Date[DO_mgL_vol<1])))%>%
+  filter(is.na(low_point)|Date<=low_point)%>% #Remove days after the lowest DO value
+  ungroup()
+
+#Calculate the rate of change in volume-weighted concentrations using lm
+vw_do_demand <- vw_do%>%
+  mutate(Year = year(Date))%>%
+  group_by(Year, LakeID)%>%
+  dplyr::summarize(n = n(),
+            DO_demand_mgLd = -lm(DO_mgL_vol~Date)$coefficients[2],
+            AHOD_mgLd = -lm(DO_mgL_area~Date)$coefficients[2],
+            p_vol = summary(lm(DO_mgL_vol~Date))$coefficients[8],
+            p_area = summary(lm(DO_mgL_area~Date))$coefficients[8],
+            r2_vol = summary(lm(DO_mgL_vol~Date))$r.squared,
+            r2_area = summary(lm(DO_mgL_area~Date))$r.squared,
+            Temp_C = mean(Temp_C, na.rm = T))%>%
+  filter(n>=3)#Need at least 3 points
+
+removed_by_r2 <- vw_do_demand%>%
+  filter(r2_vol>.5)
+
+#How many rows get removed by filtering so oxygen demand is positive? 0
+removed_by_pos <- removed_by_r2%>%
+  filter(DO_demand_mgLd>0)
+
+#Finish QAQC
+good_hod <- vw_do_demand%>%
+  group_by(LakeID)%>%
+  filter(!is.na(DO_demand_mgLd),
+         r2_vol>0.5
+         )%>%
+  dplyr::summarize(n_neg = sum(DO_demand_mgLd<0),
+                   n = n(),
+                   pct = n_neg/n*100)%>%
+  filter(pct<=10)
+
+vw_do_demand_qaqc <- removed_by_pos%>%
+  filter(LakeID %in% good_hod$LakeID)
+
+#Success!
+write.csv(vw_do_demand_qaqc, "../Compiled data/VW oxygen demand points_3m.csv", row.names = F)
+```
+
+
+Step 14: Compile all in-lake data
+```{r}
+do_demand_points <- read.csv("../Compiled data/VW oxygen demand points_3m.csv")
+vhod5_points <- read.csv("../Compiled data/VHOD5 points_3m.csv")
+shape <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/fadd3eaa25b5fdd1fc4efba70e660579")%>%
+  filter(!is.na(MeanDepth_m),
+         !is.na(MaximumDepth_m))%>%
+  mutate(VD = 3*MeanDepth_m/MaximumDepth_m)%>%
+  dplyr::select(LakeID,VD)
+summer_avgs = read.csv("../Compiled data/summer_averages_wi_3m.csv")
+strat_avgs = read.csv("../Compiled data/stratified_averages_3m.csv")%>%
+  dplyr::select(LakeID,Layer,Year,Chla_ugL,Chla_date,Temp_C,Temp_date,hypo_depth,DOC_mgL,TP_ugL,TN_ugL,buoyancy_freq, TP_date,TN_date,SA_vol_ratio)%>%
+  rename(strat_Temp_C = Temp_C,
+         strat_Temp_date = Temp_date,
+         strat_TP_ugL = TP_ugL,
+         strat_TN_ugL = TN_ugL,
+         strat_TP_date = TP_date,
+         strat_TN_date = TN_date,
+         strat_buoyancy_freq = buoyancy_freq)
+
+summer_avgs_wide <- summer_avgs%>%
+  dplyr::select(-Chla_ugL,-Chla_date,-DOC_mgL)%>%
+  full_join(strat_avgs)%>%
+  full_join(do_demand_points%>%dplyr::select(DO_demand_mgLd, AHOD_mgLd,Year, LakeID)%>%mutate(Layer="HYPO"))%>%
+  full_join(vhod5_points%>%dplyr::select(VHOD5_mgLd, Year, LakeID)%>%mutate(Layer="HYPO"))%>%
+  unique()%>%
+  pivot_wider(names_from = Layer, values_from = c(TP_ugL, TP_date, DOC_mgL, DOC_date, DO_mgL, DO_date, Chla_ugL, Chla_date, strat_Temp_C, strat_Temp_date, Temp_C, Temp_date, TN_ugL, TN_date, DO_demand_mgLd, AHOD_mgLd, buoyancy_freq, VHOD5_mgLd, hypo_depth, strat_TP_ugL, strat_TN_ugL, strat_TP_date, strat_TN_date, strat_buoyancy_freq,SA_vol_ratio))
+```
+
+
+Step 15: Add climate data
+```{r}
+#Temperature
+climate <- read.csv("../Compiled data/historical_temp_output_era5.csv")
+climate_sum <- climate%>%
+  mutate(Month = ifelse(Lat<0,Month+6,Month),
+         Year = ifelse(Month>12,Year+1,Year),
+         Month = ifelse(Month>12,Month-12,Month))%>%
+  group_by(LakeID, Year)%>%
+  mutate(n = n())%>%
+  filter(n==12)%>%
+  dplyr::summarize(mean_temp = mean(Temp_C),
+            temp_jan = unique(Temp_C[Month==1]),
+            temp_feb = unique(Temp_C[Month==2]),
+            temp_mar = unique(Temp_C[Month==3]),
+            temp_apr = unique(Temp_C[Month==4]),
+            temp_may = unique(Temp_C[Month==5]),
+            temp_jun = unique(Temp_C[Month==6]),
+            temp_july = unique(Temp_C[Month==7]),
+            temp_aug = unique(Temp_C[Month==8]),
+            temp_sep = unique(Temp_C[Month==9]),
+            temp_oct = unique(Temp_C[Month==10]),
+            temp_nov = unique(Temp_C[Month==11]),
+            temp_dec = unique(Temp_C[Month==12]),
+            Lat = unique(Lat),
+            Lon = unique(Lon))
+
+#Precipitation
+precip <- read.csv("../Compiled data/historical_precip_output_era5.csv")
+precip_sum <- precip%>%
+  mutate(Month = ifelse(Lat<0,Month+6,Month),
+         Year = ifelse(Month>12,Year+1,Year),
+         Month = ifelse(Month>12,Month-12,Month))%>%
+  group_by(LakeID, Year)%>%
+  mutate(n = n())%>%
+  filter(n==12)%>%
+  dplyr::summarize(mean_precip = mean(Total_Precip),
+            precip_jan = Total_Precip[Month==1],
+            precip_feb = Total_Precip[Month==2],
+            precip_mar = Total_Precip[Month==3],
+            precip_apr = Total_Precip[Month==4],
+            precip_may = Total_Precip[Month==5],
+            precip_jun = Total_Precip[Month==6],
+            precip_july= Total_Precip[Month==7],
+            precip_aug = Total_Precip[Month==8],
+            precip_sep = Total_Precip[Month==9],
+            precip_oct = Total_Precip[Month==10],
+            precip_nov = Total_Precip[Month==11],
+            precip_dec = Total_Precip[Month==12],
+            Lat = unique(Lat),
+            Lon = unique(Lon))
+
+with_temp_all <- summer_avgs_wide%>%
+  left_join(climate_sum)%>%
+  left_join(precip_sum)
+
+with_temp <- with_temp_all%>%
+  left_join(lat_long, by = c("LakeID"))%>%
+  filter(MaximumDepth_m>3&MaximumDepth_m<6.4,
+         !LakeID=="123",#No clear seasons
+         !LakeID=="387")#Hypolimnetic oxygenation
+
+write.csv(with_temp,"../Compiled data/All_data_annual_3m.csv",row.names =F)
+```
+
+
+Step 16: Anoxic factor- Calculate VW DO
+```{r}
+#Load data and stratification boundaries. This file is created by "03 - Stratified avgs.Rmd"
+full_with_thermo <- read.csv("../Compiled data/Stratified_period_data_with_thermo_3m.csv")%>%
+  mutate(Date=as.Date(Date))
+#Load compiled data (not needed if code above is run)
+annual_data <- read.csv("../Compiled data/All_data_annual_3m.csv")
+
+#prepare bathymetry
+lake_bats <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/ba733454c29a5f026efed05a6e6ef75b")%>%
+  filter(Area_m2>0)%>%
+  group_by(LakeID)%>%
+  mutate(methods_n = length(unique(Method)))%>%
+  filter(methods_n==1|Method=="data")%>%
+  ungroup()
+
+#Calculate volume-weighted oxygen concentrations
+vw_do <- full_with_thermo%>%
+  full_join(lake_bats, by = c("LakeID","Depth_m"))%>%
+  filter(!is.na(IntervalVolume_m3))%>%
+  filter(Depth_m>hypo_depth)%>%
+  mutate(DO_mass = DO_mgL*IntervalVolume_m3,
+         Temp_total = Temp_C*IntervalVolume_m3,
+         Year = year(Date))%>%
+  group_by(Date, LakeID)%>%
+  dplyr::summarize(DO_tot = sum(DO_mass),#sum across all hypolimnetic depths
+                   vol_tot = sum(IntervalVolume_m3),
+                   DO_mgL_vol = DO_tot/vol_tot,#Divide by hypolimnetic volume
+                   DO_mgL_area = DO_tot/max(Area_m2),
+                   Temp_C = sum(Temp_total)/vol_tot)%>%
+  mutate(Year= year(Date))%>%
+  group_by(LakeID, Year)%>%
+  filter(!is.na(DO_mgL_vol))%>%
+  arrange(LakeID, Date)%>%
+  mutate(low_point = ifelse(sum(DO_mgL_vol<1)==0,#Identify the lowest DO value for a given year
+                            Date[which.min(DO_mgL_vol)],
+                            first(Date[DO_mgL_vol<1])))%>%
+  filter(is.na(low_point)|Date<=low_point)%>% #Remove days after the lowest DO value
+  ungroup()%>%
+  mutate(Year = year(Date))
+```
+
+
+Step 17: Anoxic factor- Model end of stratification date
+```{r}
+# Calculate strat end if it can be determined within a certain range (PROXIMITY)
+PROXIMITY = 7
+
+empirical_strat_end <- full_with_thermo%>%
+  full_join(lake_bats, by = c("LakeID","Depth_m"))%>%
+  group_by(Date, LakeID)%>%
+  dplyr::summarize(mixing_date = unique(Date_end)) %>%
+  mutate(Year= year(Date))%>%
+  group_by(LakeID, Year)%>%
+  filter(Date == last(Date[Date <= as.Date(mixing_date)])) %>%
+  mutate(strat_interval = as.numeric(as.Date(mixing_date) - Date),
+         mixing_date = yday(mixing_date) - (strat_interval/2)) %>%
+  filter(strat_interval <= PROXIMITY) %>%
+  dplyr::select(LakeID, Year, mixing_date)
+
+#Generate predictions
+new_strat_end_model <- annual_data %>%
+  mutate(strat_end_new_model = 10^(1.56 + 
+                                 (-0.131 * log10(Temp_C_HYPO)) + 
+                                 (0.007 * log10(MeanDepth_m)) + 
+                                 (-0.002 * Latitude_DD) +
+                                 (0.0006 * Year)
+                                 )) %>%
+  dplyr::select(LakeID, Year, strat_end_new_model) %>%
+  unique()
+```
+
+
+Step 18: Anoxic factor- Model start of anoxia date using oxygen demand
+```{r}
+#Calculate the rate of change in volume-weighted concentrations using lm
+DO_THRESH = 1.8
+
+vw_do_demand <- vw_do%>%
+  mutate(Year = year(Date),
+         DOY = yday(Date))%>%
+  group_by(Year, LakeID)%>%
+  dplyr::summarize(n = n(),
+            DO_demand_mgLd = -lm(DO_mgL_vol~DOY)$coefficients[2],
+            r2_vol = summary(lm(DO_mgL_vol~DOY))$r.squared,
+            anoxic_onset = (DO_THRESH - lm(DO_mgL_vol~DOY)$coefficients[1]) / 
+              lm(DO_mgL_vol~DOY)$coefficients[2])%>%
+  filter(n>=3)#Need at least 3 points
+
+#How many rows get removed by filtering so R2>0.5? 246
+removed_by_r2 <- vw_do_demand%>%
+  filter(r2_vol>.5)
+
+#How many rows get removed by filtering so oxygen demand is positive? 0
+removed_by_pos <- removed_by_r2%>%
+  filter(DO_demand_mgLd>0)
+
+#Finish QAQC
+good_hod <- vw_do_demand%>%
+  group_by(LakeID)%>%
+  filter(!is.na(DO_demand_mgLd),
+         r2_vol>0.5
+         )%>%
+  dplyr::summarize(n_neg = sum(DO_demand_mgLd<0),
+                   n = n(),
+                   pct = n_neg/n*100)%>%
+  filter(pct<=10)
+
+vw_do_demand_qaqc <- removed_by_pos%>%
+  filter(LakeID %in% good_hod$LakeID)
+```
+
+
+Step 19: Anoxic factor- Empirically calculate start of anoxia date if it can be determined within a certain range (PROXIMITY)
+```{r}
+PROXIMITY = 7
+
+empirical_anoxic_onset <- vw_do %>%
+  group_by(LakeID, Year)%>%
+  filter(sum(DO_mgL_vol < DO_THRESH, na.rm = T) >= 1,
+         sum(DO_mgL_vol >= DO_THRESH & 
+               Date < first(Date[DO_mgL_vol < DO_THRESH]), 
+             na.rm = T) >= 1) %>%
+  mutate(onset = first(Date[DO_mgL_vol < DO_THRESH]),
+         before = last(Date[Date<onset]),
+         interval = as.numeric(onset-before),
+         range = DO_mgL_vol[Date==before] - DO_mgL_vol[Date==onset],
+         fraction = (DO_mgL_vol[Date==before] - DO_THRESH) / range)%>%
+  filter(interval <= PROXIMITY) %>%
+  summarize(anoxic_onset_data = unique(yday(before) + fraction * interval))
+```
+
+
+Step 20: Calculate AF, combining all info
+```{r}
+anoxic_on_off = vw_do_demand_qaqc %>%
+  dplyr::select(Year, LakeID, anoxic_onset) %>%
+  rename(anoxic_onset_vhod = anoxic_onset) %>%
+  full_join(empirical_anoxic_onset) %>%
+  full_join(empirical_strat_end) %>%
+  full_join(new_strat_end_model) %>%
+  full_join(strat_end %>% dplyr::select(LakeID, Year, strat_end_model, strat_end_model_corrected))
+
+lake_bats <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/ba733454c29a5f026efed05a6e6ef75b")%>%
+  filter(Area_m2>0)%>%
+  group_by(LakeID)%>%
+  mutate(methods_n = length(unique(Method)))%>%
+  filter(methods_n==1|Method=="data")%>%
+  ungroup()
+
+areas = full_with_thermo %>%
+  group_by(LakeID, Year) %>%
+  summarize(hypo_depth = round(mean(hypo_depth)),
+            SurfaceArea_ha = unique(SurfaceArea_ha)) %>%
+  left_join(lake_bats%>% dplyr::select(LakeID, Depth_m, Area_m2), by = c("LakeID", hypo_depth = "Depth_m"))
+
+AF = anoxic_on_off %>%
+  mutate(anoxic_onset = ifelse(!is.na(anoxic_onset_data),
+                               anoxic_onset_data,
+                               anoxic_onset_vhod),
+         anoxic_end = strat_end_new_model,
+         duration = anoxic_end - anoxic_onset) %>%
+  left_join(areas) %>%
+  mutate(AF = duration*Area_m2/(SurfaceArea_ha*10000),
+         AF = ifelse(AF < 0, 0, AF))
+```
+
+
+Step 21: Anoxic factor- If VW DO is high all summer, AF = 0 (filling in lakes where we couldn't use oxygen demand)
+```{r}
+summer <- read_csv("../Compiled data/summer_averages_wi_3m.csv")
+summer_af <- summer %>%
+  group_by(LakeID, Year) %>%
+  filter(Layer == "HYPO",
+         DO_mgL > 5) %>%
+  mutate(AF_summer = 0) %>%
+  dplyr::select(LakeID, Year, AF_summer)
+  
+AF_output <- AF %>%
+  dplyr::select(LakeID, Year, AF) %>%
+  full_join(summer_af) %>%
+  mutate(AF = ifelse(is.na(AF), AF_summer, AF)) %>%
+  dplyr::select(LakeID, Year, AF) %>%
+  filter(!is.na(AF))
+
+length(unique(AF_output$LakeID))
+nrow(AF_output)
+
+#Save results
+with_temp_af <- annual_data %>%
+  left_join(AF_output)
+
+write.csv(with_temp_af,"../Compiled data/All_data_annual AF 3m.csv",row.names =F)
+```
+
+
+Step 22: Format data for regressions
+```{r}
+#Load saved data
+with_temp <- read.csv("../Compiled data/All_data_annual AF 3m.csv") 
+with_temp_deep <- read.csv("../Compiled data/All_data_annual AF.csv") #now combine with deeper lakes
+with_temp <- with_temp%>%
+  full_join(with_temp_deep)
+
+cummean.na <- function(x, na.rm = T) {
+  n <- length(x)
+  op <- rep(NA, n)
+  for(i in 1:n) {op[i] <- mean(x[1:i], na.rm = !!na.rm)}
+  rm(x, na.rm, n, i)
+  return(op)
+}
+
+#Add relevant lags and seasonal calculations
+with_lags <- with_temp%>%
+  unique()%>%
+  group_by(LakeID)%>%
+  arrange(LakeID,Year)%>%
+  mutate(chla_lag = lag(Chla_ugL_EPI),
+         epi_p_lag = lag(TP_ugL_EPI),
+         strat_epi_p_lag = lag(strat_TP_ugL_EPI),
+         hypo_p_lag = lag(TP_ugL_HYPO),
+         epi_n_lag = lag(TN_ugL_EPI),
+         hypo_n_lag = lag(TN_ugL_HYPO),
+         AF_lag = lag(AF),
+         summer_temp = (temp_july + temp_aug)/2,
+         spring_temp = (temp_mar + temp_apr)/2,
+         winter_temp = (temp_jan + temp_feb)/2,
+         fall_temp = (temp_sep+temp_oct)/2,
+         summer_precip = (precip_july+ precip_aug)/2,
+         spring_precip = (precip_mar + precip_apr)/2,
+         winter_precip = (precip_jan + precip_feb)/2,
+         anoxic = max(DO_mgL_HYPO,na.rm = T) < 1.8,
+         lag_is_last_year = ifelse(lag(Year) == (Year-1), T, F))%>%
+  mutate(across(contains("_lag"), function(x) ifelse(lag_is_last_year, x, NA)))
+
+# Save this as the dataset we will work with
+dataset <- with_lags
+
+data_log_nuts <- dataset%>%
+  mutate(Chla_ugL_EPI=log(Chla_ugL_EPI),
+         chla_lag = log(chla_lag),
+         TP_ugL_EPI = log(TP_ugL_EPI),
+         strat_TP_ugL_EPI = log(strat_TP_ugL_EPI),
+         TP_ugL_HYPO = log(TP_ugL_HYPO),
+         TN_ugL_EPI = log(TN_ugL_EPI),
+         strat_TN_ugL_EPI = log(strat_TN_ugL_EPI),
+         TN_ugL_HYPO = log(TN_ugL_HYPO),
+         epi_p_lag = log(epi_p_lag),
+         strat_epi_p_lag = log(strat_epi_p_lag),
+         hypo_p_lag = log(hypo_p_lag),
+         epi_n_lag = log(epi_n_lag),
+         hypo_n_lag = log(hypo_n_lag)) #produces NAs because of two EPI TN == 0
+
+#Create datasets that are only oxic or only anoxic lakes
+data_always_oxic <- dataset %>%
+  group_by(LakeID) %>%
+  filter(!is.finite(max(AF, na.rm = T)) || max(AF, na.rm = T) > 0,
+         min(DO_mgL_HYPO, na.rm = T) > 1.8)
+
+data_no_oxic <- dataset %>%
+  group_by(LakeID) %>%
+  filter(is.finite(max(AF, na.rm = T)) && max(AF, na.rm = T) > 0)
+
+#How many always oxic lakes are we removing?
+compare <- dataset %>%
+  group_by(LakeID) %>%
+  filter(is.finite(max(AF, na.rm = T)))
+length(unique(compare$LakeID)) - length(unique(data_no_oxic$LakeID))
+```
+
+
+Step 17: Model selection
+```{r}
+responses <- c("DO_demand_mgLd_HYPO")
+selected_drivers <- c("Chla_ugL_EPI","chla_lag","strat_Temp_C_HYPO","SA_vol_ratio_HYPO")
+std_data <- standardize_data(data_log_nuts,responses,selected_drivers)
+vhod <- plot_effects_lmer(mod_lmer,"Oxygen demand (mg/L/d)", poster = POSTER)
+
+### Anoxic factor
+responses <- c("AF")
+selected_drivers <- c("DO_demand_mgLd_HYPO","spring_temp","fall_temp","Temp_C_HYPO")
+af <- plot_effects_lmer(mod_lmer,"Anoxic factor", poster = POSTER) 
+
+### Epi. TP
+responses <- c("strat_TP_ugL_EPI")
+selected_drivers <- c("TP_ugL_HYPO","hypo_p_lag","epi_p_lag","spring_precip","summer_precip","strat_TP_date_EPI")
+epi_p <- plot_effects_lmer(mod_lmer,"Epilimnetic TP (µg/L)", poster = POSTER) 
+
+### TP with AF
+responses <- c("TP_ugL_HYPO")
+selected_drivers <- c("strat_TP_ugL_EPI","AF", "winter_precip")
+hypo_p_af <- plot_effects_lmer(mod_lmer,"Hypolimnetic TP (µg/L)", poster = POSTER) 
+
+### Epi. chl-a
+responses <- c("Chla_ugL_EPI")
+selected_drivers <- c("spring_temp","strat_TP_ugL_EPI")
+epi_chla <- plot_effects_lmer(mod_lmer,"Epilimnetic chl-a (µg/L)", poster = POSTER) 
+```
+
+
+Step 18: Generate combined figures
+```{r}
+g1 <- ggplotGrob(
+  hypo_p_af  +theme(plot.title = element_text(size = 10),
+                         plot.subtitle = element_text(size = 9),
+                         axis.title.x = element_blank())+
+                   force_panelsizes(rows = unit(3*5/6, "cm")))
+g2 <- ggplotGrob(
+  epi_p   +theme(plot.title = element_text(size = 10),
+                         plot.subtitle = element_text(size = 9),
+                         axis.title.x = element_blank())+
+                   force_panelsizes(rows = unit(6*5/6, "cm")))
+g3 <- ggplotGrob(
+  epi_chla+theme(plot.title = element_text(size = 10),
+                         plot.subtitle = element_text(size = 9))+
+                   force_panelsizes(rows = unit(2*5/6, "cm")))
+g4 <- ggplotGrob(
+  vhod    +theme(plot.title = element_text(size = 10),
+                         plot.subtitle = element_text(size = 9),
+                         axis.title.x = element_blank())+
+                   force_panelsizes(rows = unit(4*5/6, "cm")))
+g5 <- ggplotGrob(
+  af +theme(plot.title = element_text(size = 10),
+                         plot.subtitle = element_text(size = 9))+
+                   force_panelsizes(rows = unit(4*5/6, "cm")))
+maxWidth <- unit.pmax(g1$widths,g2$widths,g3$widths,g4$widths,g5$widths)
+g1$widths <- maxWidth
+g2$widths <- maxWidth
+g3$widths <- maxWidth
+g4$widths <- maxWidth
+g5$widths <- maxWidth
+
+layout <- rbind(c(1, 4),
+                c(1, 4),
+                c(1, 4),
+                c(1, 4),
+                c(1, 4),
+                c(2, 4),
+                c(2, 5),
+                c(2, 5),
+                c(2, 5),
+                c(2, 5),
+                c(2, 5),
+                c(2, 5),
+                c(2, 5),
+                c(3, NA),
+                c(3, NA),
+                c(3, NA),
+                c(3, NA),
+                c(3, NA))
+jpeg("../Figures/MLR-lmer/Parameter estimate-all-custom layout-AF_3m.jpeg", width = 7, height = 6, res = 300, units = "in")
+grid.arrange(g1,g2,g3,g4,g5,layout_matrix=layout)
+dev.off()
+```
