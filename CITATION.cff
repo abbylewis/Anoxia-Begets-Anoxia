@@ -12,6 +12,6 @@ version: v1.1.0
 date-released: 2023-11-01
 identifiers:
   - type: doi
-    value: 10.5281/zenodo.8155128
+    value: 10.5281/zenodo.10064087
 repository-code: "https://github.com/abbylewis/Anoxia-Begets-Anoxia"
 license: MIT
