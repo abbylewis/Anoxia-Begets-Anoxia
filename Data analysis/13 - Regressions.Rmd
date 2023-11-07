@@ -520,7 +520,7 @@ for_mlr%>%
   geom_hline(yintercept = 0)+
   geom_smooth(method = "lm", color = "black")+
   theme_bw()+
-  ylab("Coefficient for the\neffect of hypo. TP (t-1) on epi TP")+
+  ylab("Coefficient for the effect\nof hypo. TP (t-1) on epi TP")+
   xlab("Residence time (d)")
 
 potential_drivers <- c("log_MeanDepth_m",
@@ -550,7 +550,7 @@ chla <- for_mlr%>%
   scale_x_log10()+
   geom_hline(yintercept = 0)+
   theme_bw()+
-  ylab("Coefficient for the\neffect of epi. TP on chl-a")+
+  ylab("Coefficient for the effect\nof epi. TP on chl-a")+
   xlab("Mean epilimnetic TP (µg/L)")+
   annotate("text", x = 8, y = 0.87,
            label = paste0("R^2 == ",r2_value_text,"~~~p ", p_value_text), 
@@ -572,7 +572,7 @@ for_mlr%>%
   geom_hline(yintercept = 0)+
   theme_bw()+
   theme(legend.title = element_blank())+
-  ylab("Coefficient for the\neffect of epi. TP on chl-a")+
+  ylab("Coefficient for the effect\nof epi. TP on chl-a")+
   xlab("Mean epilimnetic TP (µg/L)")
 dev.off()
 
@@ -649,7 +649,7 @@ demand_af <- for_mlr%>%
   geom_hline(yintercept = 0)+
   theme_bw()+
   #scale_color_viridis_c(trans = "log", breaks = c(25,50,100,200), name = "Maximum\ndepth (m)")+
-  ylab("Coefficient for the\neffect of VHOD on AF")+
+  ylab("Coefficient for the effect\nof VHOD on AF")+
   xlab("Mean depth (m)")+
   guides(shape = "none") +
   annotate("text",x = 3, y = 1.15,
@@ -699,7 +699,7 @@ vhod <- for_mlr%>%
   scale_x_log10()+
   theme_bw()+
   geom_hline(yintercept = 0)+
-  ylab("Coefficient for the\neffect of chl-a (t-1) on VHOD")+
+  ylab("Coefficient for the effect\nof chl-a (t-1) on VHOD")+
   xlab("Residence time (d)")+
   geom_point(color = "grey50")+
   geom_smooth(method = "lm",color = "black")+
@@ -710,12 +710,16 @@ vhod <- for_mlr%>%
 jpeg("../Figures/Driver analysis AF.jpg", width = 7, height = 5, res = 300, units = "in")
 ggarrange(ggarrange(chla,
                     vhod,
-                    labels = c("A","B"),
-                    label.x = -0.01),
+                    labels = c("(a)","(b)"),
+                    label.y = 1.02,
+                    label.x = 0.02,
+                    font.label = list(face = "bold")),
           ggarrange(demand_af,
                     ggplot()+geom_blank()+theme_minimal(),
-                    labels = c("C", NA),
-                    label.x = -0.005
+                    labels = c("(c)", NA),
+                    label.y = 1.02,
+                    label.x = 0.02,
+                    font.label = list(face = "bold")
                     ),
           nrow = 2
           )
