@@ -65,9 +65,9 @@ set.seed(47) #Set seed so points jitter the same way each time
 Step 2: QAQC
 ```{r}
 #import data
-to_profiles_all <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/caf59a118a1490e7cb1a219c55b920f9")
+to_profiles_all <- read.csv("https://pasta.lternet.edu/package/data/eml/edi/1530/1/caf59a118a1490e7cb1a219c55b920f9")
 to_profiles_all$Date <- as.Date(to_profiles_all$Date)
-lat_long <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/fadd3eaa25b5fdd1fc4efba70e660579") #Metadata
+lat_long <- read.csv("https://pasta.lternet.edu/package/data/eml/edi/1530/1/fadd3eaa25b5fdd1fc4efba70e660579") #Metadata
 
 #Filter to only lakes between 3 and 6.4 m depth, which we will be adding
 to_profiles <- to_profiles_all%>%
@@ -276,7 +276,7 @@ write.csv(database.interp,"../Compiled data/temp_o2_interpolated_3m.csv")
 Step 6: Load productivity data
 ```{r}
 ## Load productivity data and metadata from EDI
-p <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/0ece9d7b67cd49741ed7ee60192832e4") 
+p <- read.csv("https://pasta.lternet.edu/package/data/eml/edi/1530/1/0ece9d7b67cd49741ed7ee60192832e4") 
 #Load interpolated DO data file
 do <- read.csv("../Compiled data/temp_o2_interpolated_3m.csv") %>%
   mutate(Date = as.Date(Date))
@@ -436,7 +436,7 @@ summer_avgs <- summer_avgs%>%
 ###
 
 #Load bathymetry
-lake_bats.raw <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/ba733454c29a5f026efed05a6e6ef75b")%>%
+lake_bats.raw <- read.csv("https://pasta.lternet.edu/package/data/eml/edi/1530/1/ba733454c29a5f026efed05a6e6ef75b")%>%
   filter(Area_m2>0)%>%
   group_by(LakeID)%>%
   mutate(methods_n = length(unique(Method)))%>%
@@ -615,7 +615,7 @@ full_with_thermo <- read.csv("../Compiled data/Stratified_period_data_with_therm
 
 #prepare bathymetry
 #lake with only one method (data/model)
-lake_bats <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/ba733454c29a5f026efed05a6e6ef75b")%>%
+lake_bats <- read.csv("https://pasta.lternet.edu/package/data/eml/edi/1530/1/ba733454c29a5f026efed05a6e6ef75b")%>%
   filter(Area_m2>0)%>%
   group_by(LakeID)%>%
   mutate(methods_n = length(unique(Method)))%>%
@@ -690,7 +690,7 @@ Step 14: Compile all in-lake data
 ```{r}
 do_demand_points <- read.csv("../Compiled data/VW oxygen demand points_3m.csv")
 vhod5_points <- read.csv("../Compiled data/VHOD5 points_3m.csv")
-shape <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/fadd3eaa25b5fdd1fc4efba70e660579")%>%
+shape <- read.csv("https://pasta.lternet.edu/package/data/eml/edi/1530/1/fadd3eaa25b5fdd1fc4efba70e660579")%>%
   filter(!is.na(MeanDepth_m),
          !is.na(MaximumDepth_m))%>%
   mutate(VD = 3*MeanDepth_m/MaximumDepth_m)%>%
@@ -791,7 +791,7 @@ full_with_thermo <- read.csv("../Compiled data/Stratified_period_data_with_therm
 annual_data <- read.csv("../Compiled data/All_data_annual_3m.csv")
 
 #prepare bathymetry
-lake_bats <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/ba733454c29a5f026efed05a6e6ef75b")%>%
+lake_bats <- read.csv("https://pasta.lternet.edu/package/data/eml/edi/1530/1/ba733454c29a5f026efed05a6e6ef75b")%>%
   filter(Area_m2>0)%>%
   group_by(LakeID)%>%
   mutate(methods_n = length(unique(Method)))%>%
@@ -925,7 +925,7 @@ anoxic_on_off = vw_do_demand_qaqc %>%
   full_join(new_strat_end_model) %>%
   full_join(strat_end %>% dplyr::select(LakeID, Year, strat_end_model, strat_end_model_corrected))
 
-lake_bats <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/ba733454c29a5f026efed05a6e6ef75b")%>%
+lake_bats <- read.csv("https://pasta.lternet.edu/package/data/eml/edi/1530/1/ba733454c29a5f026efed05a6e6ef75b")%>%
   filter(Area_m2>0)%>%
   group_by(LakeID)%>%
   mutate(methods_n = length(unique(Method)))%>%

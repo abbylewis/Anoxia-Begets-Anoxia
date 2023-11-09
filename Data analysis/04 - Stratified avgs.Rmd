@@ -26,8 +26,8 @@ library(rLakeAnalyzer)
 source("thermo.depth.density.R")
 
 ## Load productivity data and metadata from EDI
-p <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/0ece9d7b67cd49741ed7ee60192832e4")
-lat_long <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/fadd3eaa25b5fdd1fc4efba70e660579")
+p <- read.csv("https://pasta.lternet.edu/package/data/eml/edi/1530/1/0ece9d7b67cd49741ed7ee60192832e4")
+lat_long <- read.csv("https://pasta.lternet.edu/package/data/eml/edi/1530/1/fadd3eaa25b5fdd1fc4efba70e660579")
 #Load interpolated DO data file, created by "02 - Temp and DO interpolation.Rmd"
 do <- read.csv("../Compiled data/temp_o2_interpolated.csv")
 ```
@@ -204,7 +204,7 @@ summer_avgs <- summer_avgs%>%
 ###
 
 #Load bathymetry
-lake_bats.raw <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/ba733454c29a5f026efed05a6e6ef75b")%>%
+lake_bats.raw <- read.csv("https://pasta.lternet.edu/package/data/eml/edi/1530/1/ba733454c29a5f026efed05a6e6ef75b")%>%
   filter(Area_m2>0)%>%
   group_by(LakeID)%>%
   mutate(methods_n = length(unique(Method)))%>%

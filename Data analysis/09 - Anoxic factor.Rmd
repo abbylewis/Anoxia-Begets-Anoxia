@@ -29,7 +29,7 @@ library(openair)
 full_with_thermo <- read.csv("../Compiled data/Stratified_period_data_with_thermo.csv")%>%
   mutate(Date=as.Date(Date))
 #Load lake metadata
-lat_long <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/fadd3eaa25b5fdd1fc4efba70e660579")
+lat_long <- read.csv("https://pasta.lternet.edu/package/data/eml/edi/1530/1/fadd3eaa25b5fdd1fc4efba70e660579")
 #Load compiled data
 annual_data <- read.csv("../Compiled data/All_data_annual.csv")
 ```
@@ -38,7 +38,7 @@ annual_data <- read.csv("../Compiled data/All_data_annual.csv")
 Step 2: Calculate VW DO
 ```{r}
 #prepare bathymetry
-lake_bats <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/ba733454c29a5f026efed05a6e6ef75b")%>%
+lake_bats <- read.csv("https://pasta.lternet.edu/package/data/eml/edi/1530/1/ba733454c29a5f026efed05a6e6ef75b")%>%
   filter(Area_m2>0)%>%
   group_by(LakeID)%>%
   mutate(methods_n = length(unique(Method)))%>%
@@ -196,7 +196,7 @@ anoxic_on_off = vw_do_demand_qaqc %>%
   full_join(new_strat_end_model) %>%
   full_join(strat_end %>% dplyr::select(LakeID, Year, strat_end_model, strat_end_model_corrected))
 
-lake_bats <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/ba733454c29a5f026efed05a6e6ef75b")%>%
+lake_bats <- read.csv("https://pasta.lternet.edu/package/data/eml/edi/1530/1/ba733454c29a5f026efed05a6e6ef75b")%>%
   filter(Area_m2>0)%>%
   group_by(LakeID)%>%
   mutate(methods_n = length(unique(Method)))%>%

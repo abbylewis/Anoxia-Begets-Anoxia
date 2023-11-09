@@ -447,7 +447,7 @@ incomplete <- all_lakes_chla%>%
               rename(DO_demand_mgLd_HYPO_af = DO_demand_mgLd_HYPO))
 
 hydro <- read.csv("../Compiled data/hydrolakes_full.csv")
-lat_long <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/fadd3eaa25b5fdd1fc4efba70e660579")
+lat_long <- read.csv("https://pasta.lternet.edu/package/data/eml/edi/1530/1/fadd3eaa25b5fdd1fc4efba70e660579")
 
 means <- with_temp%>%
   group_by(LakeID)%>%

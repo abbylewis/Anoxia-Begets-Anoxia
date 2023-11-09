@@ -29,7 +29,7 @@ Step 2: Add hydrolakes data
 ```{r}
 dbf <- read.dbf("../External data/HydroLAKES_points_v10_shp/HydroLAKES_points_v10.dbf")
 
-ids <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/fadd3eaa25b5fdd1fc4efba70e660579")%>%
+ids <- read.csv("https://pasta.lternet.edu/package/data/eml/edi/1530/1/fadd3eaa25b5fdd1fc4efba70e660579")%>%
   select(LakeID,hylak_id)%>%
   rename(ID = LakeID)
 

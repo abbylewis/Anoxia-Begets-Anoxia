@@ -34,9 +34,9 @@ Step 2: QAQC
 Load data from EDI and run QAQC
 ```{r}
 #import data
-to_profiles_all <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/caf59a118a1490e7cb1a219c55b920f9")
+to_profiles_all <- read.csv("https://pasta.lternet.edu/package/data/eml/edi/1530/1/caf59a118a1490e7cb1a219c55b920f9")
 to_profiles_all$Date <- as.Date(to_profiles_all$Date)
-lat_long <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/fadd3eaa25b5fdd1fc4efba70e660579") #Metadata
+lat_long <- read.csv("https://pasta.lternet.edu/package/data/eml/edi/1530/1/fadd3eaa25b5fdd1fc4efba70e660579") #Metadata
 
 #Remove very shallow lakes
 to_profiles <- to_profiles_all%>%

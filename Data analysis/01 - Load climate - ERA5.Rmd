@@ -37,7 +37,7 @@ Step 2: Load and synthesize data
 (note: this will take several minutes to run on a personal computer)
 ```{r}
 #Read and format our lake metadata
-lakes <- read.csv("https://pasta-s.lternet.edu/package/data/eml/edi/1029/9/fadd3eaa25b5fdd1fc4efba70e660579") 
+lakes <- read.csv("https://pasta.lternet.edu/package/data/eml/edi/1530/1/fadd3eaa25b5fdd1fc4efba70e660579") 
 lakes_format <- lakes %>%
   dplyr::select(LakeID,Longitude_DD,Latitude_DD) %>%
   rename(Lon=Longitude_DD,Lat=Latitude_DD)%>%
