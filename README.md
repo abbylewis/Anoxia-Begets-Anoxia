@@ -27,22 +27,22 @@ All data analysis scripts:
     * Load netcdf of global climate data and output a csv with air temperature records at each lake
 * `02 - Temp and DO interpolation.Rmd`
     * Interpolate temperature and oxygen profiles to a 1 m depth resolution
-* `03 - Stratified avgs.Rmd`
+* `03 - Data characterization.Rmd`
+    * Characterize the full, synthesized dataset. Output summary figures
+* `04 - Stratified avgs.Rmd`
     * Calculate epilimnetic and hypolimnetic means during the stratified period of each year. Add in additional chlorophyll-a data using "chla_harmonizer.csv"
-* `04 - Summer avgs.Rmd`
+* `05 - Summer avgs.Rmd`
     * Calculate epilimnetic and hypolimnetic means during the late-summer period of each year
-* `05 - hydrolakes.Rmd`
+* `06 - hydrolakes.Rmd`
     * Load all hydrolakes data and output a csv with hydrolakes metadata for each lake
-* `06 - VW DO Demand - based on strat dur.Rmd`
+* `07 - VW DO Demand - based on strat dur.Rmd`
     * Calculate volume-weighted hypolimnetic oxygen demand for each lake-year
-* `07 - Compile data.Rmd`
+* `08 - Compile data.Rmd`
     * Combine late-summer and stratified means with oxygen demand, and climate data. Output a file for following analyses.
-* `08 - Data characterization.Rmd`
-    * Characterize the full, synthesized dataset. Output summary figures
 * `09 - Anoxic factor.Rmd`
-    * Characterize the full, synthesized dataset. Output summary figures
+    * Calculate anoxic factor for the entire hypolimnion
 * `10 - Anoxic factor layers.Rmd`
-    * Characterize the full, synthesized dataset. Output summary figures
+    * Calcluate anoxic factor in two layers at all lakes
 * `11 - Air temp analysis.Rmd`
     * Analyze the effects of changing monthly air temperatures on hypolimnetic temperature and oxygen dynamics
 * `12 - Lags.Rmd`

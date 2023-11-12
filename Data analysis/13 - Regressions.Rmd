@@ -282,7 +282,7 @@ seglme <- segmented.lme(mod_seg, random=list(LakeID=pdDiag(~1)), seg.Z = ~DO_mgL
 break_untrans <- round(unique(seglme$fixed.eta.psi),1)
 summary(seglme)
 
-jpeg("../Figures/DO TP black.jpeg", width = 3, height = 3, res = 300, units = "in")
+png("../Figures/DO TP black.png", width = 3, height = 3, res = 1000, units = "in")
 do_tp <- with_lags%>%
   filter(!is.na(TP_ugL_HYPO))%>%
   ungroup()%>%
@@ -360,7 +360,7 @@ layout <- rbind(c(1, 4),
                 c(3, NA),
                 c(3, NA),
                 c(3, NA))
-jpeg("../Figures/MLR-lmer/Parameter estimate-all-custom layout-AF.jpeg", width = 7, height = 6, res = 300, units = "in")
+jpeg("../Figures/MLR-lmer/Parameter estimate-all-custom layout-AF.jpeg", width = 7, height = 6, res = 600, units = "in")
 grid.arrange(g1,g2,g3,g4,g5,layout_matrix=layout)
 dev.off()
 
@@ -424,7 +424,7 @@ layout <- rbind(c(1, 2),
                 c(4, 5),
                 c(4, NA),
                 c(4, NA))
-jpeg("../Figures/MLR-lmer/Parameter estimate-all-ridge-af.jpeg", width = 6, height = 6, res = 300, units = "in")
+jpeg("../Figures/MLR-lmer/Parameter estimate-all-ridge-af.jpeg", width = 6, height = 6, res = 600, units = "in")
 grid.arrange(g1,g2,g3,g4,g5, layout_matrix=layout)
 dev.off()
 ```
@@ -707,7 +707,7 @@ vhod <- for_mlr%>%
            label = paste0("R^2 == ",r2_value_text,"~~~p ", p_value_text), 
            parse = TRUE)
 
-jpeg("../Figures/Driver analysis AF.jpg", width = 7, height = 5, res = 300, units = "in")
+png("../Figures/Driver analysis AF.png", width = 7, height = 5, res = 1000, units = "in")
 ggarrange(ggarrange(chla,
                     vhod,
                     labels = c("(a)","(b)"),
