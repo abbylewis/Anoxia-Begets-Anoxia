@@ -66,7 +66,6 @@ length(unique(summer_avgs_wide$LakeID))
 doc <- summer_avgs%>%
   dplyr::select(-Chla_ugL,-Chla_date,-DOC_mgL)%>%
   full_join(strat_avgs)%>%
-  full_join(bathy_anox%>%mutate(Layer="HYPO"))%>%
   full_join(do_demand_points%>%dplyr::select(DO_demand_mgLd, Year, LakeID)%>%mutate(Layer="HYPO"))%>%
   full_join(vhod5_points%>%dplyr::select(VHOD5_mgLd, Year, LakeID)%>%mutate(Layer="HYPO"))%>%
   filter(!is.na(DOC_mgL))
@@ -75,7 +74,6 @@ length(unique(doc$LakeID))
 tn <- summer_avgs%>%
   dplyr::select(-Chla_ugL,-Chla_date,-DOC_mgL)%>%
   full_join(strat_avgs)%>%
-  full_join(bathy_anox%>%mutate(Layer="HYPO"))%>%
   full_join(do_demand_points%>%dplyr::select(DO_demand_mgLd, Year, LakeID)%>%mutate(Layer="HYPO"))%>%
   full_join(vhod5_points%>%dplyr::select(VHOD5_mgLd, Year, LakeID)%>%mutate(Layer="HYPO"))%>%
   filter(!is.na(TN_ugL))
